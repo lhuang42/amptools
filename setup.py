@@ -8,7 +8,7 @@ setup(
     author_email='james.casbon@popgentech.com',
     packages=['amptools'],
     install_requires=[
-        'pysam',
+        'pysam>0.6',
         'cmdln'
     ], 
     scripts=['amptools/amptools']

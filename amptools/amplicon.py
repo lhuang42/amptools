@@ -3,13 +3,16 @@ import sys
 import itertools
 import cigar
 
+# set the pileup engine to allow 1500 samples at depth of 200
+PILEUP_MAX_DEPTH = 200 * 1500
+
 class Amplicon(object):
         
     def __str__(self):
         return '%s:%s-%s:%s' % (self.chr, self.start, self.end, self.strand)
     
     def __init__(self, external_id=None, chr=None, start=None, end=None, 
-        strand=None, trim_start=None, trim_end=None, **args):
+        strand=None, trim_start=None, trim_end=None, stats=None, **args):
         self.external_id = external_id
         self.chr = chr
         self.start = start 
@@ -17,6 +20,7 @@ class Amplicon(object):
         self.strand = strand
         self.trim_start = trim_start
         self.trim_end = trim_end
+        self.stats = stats
     
     def reads_from(self, samfile, offset_allowed=10):
         """ Return an iterator of reads from this amplicon in the samfile """
@@ -25,7 +29,7 @@ class Amplicon(object):
         def filterfunc(x):
             start_correct = abs(x.pos - self.start) < offset_allowed
             end_correct = abs(x.aend - self.end) < offset_allowed
-            
+                        
             if self.strand > 0: 
                 orientation_correct = not x.is_reverse
                 return start_correct and orientation_correct
@@ -33,7 +37,7 @@ class Amplicon(object):
                 orientation_correct = x.is_reverse
                 return end_correct and orientation_correct
             else: 
-                return start_correct or orientation_correct
+                return start_correct or end_correct
                         
         return itertools.ifilter(filterfunc, reads)
     
@@ -41,13 +45,13 @@ class Amplicon(object):
         """ create a dictionary of read accession to pileup at a position """
         pileup_dict = {}
         
-        for pu_column in samfile.pileup(self.chr, position, position+1):
+        for pu_column in samfile.pileup(self.chr, position, position+1, max_depth=PILEUP_MAX_DEPTH  ):
             if pu_column.pos != position:
                 continue
             
             for pu in pu_column.pileups:
                 pileup_dict[pu.alignment.qname] = pu.qpos
-                
+            
         return pileup_dict
                                                                                             
     def pileup_dict_at_start(self, samfile):
@@ -69,6 +73,7 @@ class Amplicon(object):
         seq, qual, cig, end_pos = read.seq, read.qual, read.cigar, read.aend
         
         if first_base_pos: 
+            self.stats.start_trim(self.external_id)
             read.seq = seq[first_base_pos:]
             read.qual = qual[first_base_pos:]            
             read.cigar = cigar.trim_cigar(cig, len(read.seq), start=True)
@@ -82,6 +87,7 @@ class Amplicon(object):
                 last_base_pos = last_base_pos - first_base_pos
             
         if last_base_pos != -1: 
+            self.stats.end_trim(self.external_id)
             read.seq = seq[:last_base_pos]
             read.qual = qual[:last_base_pos]
             read.cigar = cigar.trim_cigar(cig, len(read.seq))
@@ -89,10 +95,10 @@ class Amplicon(object):
         return read
     
     
-    def clipped_reads(self, samfile):
+    def clipped_reads(self, samfile, **kws):
         """ return all the reads of this amplicon clipped """
 
-        reads = self.reads_from(samfile)
+        reads = self.reads_from(samfile, **kws)
         self.start_trim_dict = self.pileup_dict_at_start(samfile)
         self.end_trim_dict = self.pileup_dict_at_end(samfile)
         
