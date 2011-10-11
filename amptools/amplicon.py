@@ -1,10 +1,33 @@
 from __future__ import print_function
 import sys
 import itertools
+import csv
 import cigar
+from ucsc import Interval    
 
 # set the pileup engine to allow 1500 samples at depth of 200
 PILEUP_MAX_DEPTH = 200 * 1500
+
+
+def load_amplicons(design, stats, opts):
+    amplicons = []
+    for row in csv.DictReader(file(design, 'U'), delimiter=opts.delimiter): 
+        amp_loc = Interval.from_string(row[opts.amplicon_column])
+        trim_loc = Interval.from_string(row[opts.trim_column])
+
+        if not amp_loc.contains(trim_loc):
+            print('trim location not contained in amplicon location, impossible trim', file=sys.stderr)
+            sys.exit(1)
+
+        amplicon = Amplicon(
+            chr=amp_loc.chrom, start=amp_loc.start, end=amp_loc.end,
+            trim_start = trim_loc.start, trim_end=trim_loc.end, 
+            external_id = row[opts.id_column], stats = stats, 
+            offset_allowed=opts.offset_allowed
+        )
+        amplicons.append(amplicon)
+    return amplicons
+        
 
 class Amplicon(object):
         
@@ -12,7 +35,7 @@ class Amplicon(object):
         return '%s:%s-%s:%s' % (self.chr, self.start, self.end, self.strand)
     
     def __init__(self, external_id=None, chr=None, start=None, end=None, 
-        strand=None, trim_start=None, trim_end=None, stats=None, **args):
+        strand=None, trim_start=None, trim_end=None, stats=None, offset_allowed=10):
         self.external_id = external_id
         self.chr = chr
         self.start = start 
@@ -21,25 +44,31 @@ class Amplicon(object):
         self.trim_start = trim_start
         self.trim_end = trim_end
         self.stats = stats
+        self.offset_allowed = offset_allowed
     
-    def reads_from(self, samfile, offset_allowed=10):
+    def reads_from(self, samfile):
         """ Return an iterator of reads from this amplicon in the samfile """
         reads = samfile.fetch(self.chr, self.start, self.end)
+        return itertools.ifilter(self.matches, reads)
         
-        def filterfunc(x):
-            start_correct = abs(x.pos - self.start) < offset_allowed
-            end_correct = abs(x.aend - self.end) < offset_allowed
-                        
-            if self.strand > 0: 
-                orientation_correct = not x.is_reverse
-                return start_correct and orientation_correct
-            elif self.strand < 0: 
-                orientation_correct = x.is_reverse
-                return end_correct and orientation_correct
-            else: 
-                return start_correct or end_correct
-                        
-        return itertools.ifilter(filterfunc, reads)
+    def matches(self, read):
+        """ return True if the read looks like it came from this amplicon"""
+        start_correct = abs(read.pos - self.start) < self.offset_allowed
+        end_correct = abs(read.aend - self.end) < self.offset_allowed
+                    
+        if self.strand > 0: 
+            orientation_correct = not read.is_reverse
+            match =  start_correct and orientation_correct
+        elif self.strand < 0: 
+            orientation_correct = read.is_reverse
+            match = end_correct and orientation_correct
+        else: 
+            match = start_correct or end_correct
+        
+        if match: 
+            self.stats.match(self.external_id)
+            
+        return match 
     
     def pileup_dict_at_position(self, samfile, position):
         """ create a dictionary of read accession to pileup at a position """
@@ -95,10 +124,10 @@ class Amplicon(object):
         return read
     
     
-    def clipped_reads(self, samfile, **kws):
+    def clipped_reads(self, samfile):
         """ return all the reads of this amplicon clipped """
 
-        reads = self.reads_from(samfile, **kws)
+        reads = self.reads_from(samfile)
         self.start_trim_dict = self.pileup_dict_at_start(samfile)
         self.end_trim_dict = self.pileup_dict_at_end(samfile)
         

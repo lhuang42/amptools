@@ -4,7 +4,7 @@ import sys
 import csv
 import cmdln
 import pysam
-from amplicon import Amplicon
+from amplicon import Amplicon, load_amplicons
 from ucsc import Interval    
 from stats import Stats
 
@@ -72,7 +72,7 @@ class Amptools(cmdln.Cmdln):
                 
     @cmdln.option("-o", "--outfile", action="store", default='-',
                   help="Output file (default stdout)")
-    @cmdln.option("-b", "--offset-bases", action="store", default=10,
+    @cmdln.option("-b", "--offset-allowed", action="store", default=10,
                 help="Allowed difference between expected start of amplicon and start of read (default 10)")
 
     def do_clip(self, subcmd, opts, bamfile, design):
@@ -86,26 +86,44 @@ class Amptools(cmdln.Cmdln):
             ${cmd_option_list}
         """
         stats = Stats(' '.join(sys.argv))        
-        amplicons = []
-        for row in csv.DictReader(file(design), delimiter=opts.delimiter): 
-            amp_loc = Interval.from_string(row[opts.amplicon_column])
-            trim_loc = Interval.from_string(row[opts.trim_column])
-
-            if not amp_loc.contains(trim_loc):
-                print('trim location not contained in amplicon location, impossible trim', file=sys.stderr)
-                sys.exit(1)
-
-            amplicon = Amplicon(chr=amp_loc.chrom, start=amp_loc.start, end=amp_loc.end,
-                trim_start = trim_loc.start, trim_end=trim_loc.end, 
-                external_id = str(amp_loc), stats = stats
-            )
-            amplicons.append(amplicon)
+        amplicons = load_amplicons(design, stats, opts)
         
         samfile = pysam.Samfile(bamfile, 'rb')
         outfile = pysam.Samfile(opts.outfile, 'wb', template=samfile)
     
         for amplicon in amplicons: 
-            trimmed = amplicon.clipped_reads(samfile, offset_allowed=opts.offset_bases)
+            trimmed = amplicon.clipped_reads(samfile)
             map(outfile.write, trimmed)
     
         stats.report(sys.stderr)
+        
+    @cmdln.option("-d", "--delimiter", action="store", default=',',
+                  help="Delimiter for design file (default ,)")
+    @cmdln.option("-a", "--amplicon-column", action="store", default='amplicon_location',
+                help="Column for amplicons in design file (default 'amplicon_location')")
+    @cmdln.option("-t", "--trim-column", action="store", default='trim_location',
+                help="Column for trim location in design file (default 'trim_location')")
+    @cmdln.option("-i", "--id-column", action="store", default='id',
+                help="Column for trim location in design file (default 'trim_location')")
+    @cmdln.option("-o", "--outfile", action="store", default='-',
+                  help="Output file (default stdout)")
+    @cmdln.option("-b", "--offset-allowed", action="store", default=10,
+                help="Allowed difference between expected start of amplicon and start of read (default 10)")
+
+    def do_mark(self, subcmd, opts, bamfile, design):
+        """ Mark reads that match amplicons using the AM tag """
+        stats = Stats(' '.join(sys.argv))        
+        amplicons = load_amplicons(design, stats, opts)
+
+        samfile = pysam.Samfile(bamfile, 'rb')
+        outfile = pysam.Samfile(opts.outfile, 'wb', template=samfile)
+
+        for read in samfile: 
+            stats.reads += 1
+            for amp in amplicons:
+                if amp.matches(read):
+                    read.tags = (read.tags or []) + [('AM', amp.external_id)]
+            outfile.write(read) 
+        
+        stats.report(sys.stderr)
+        
