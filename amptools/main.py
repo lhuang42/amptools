@@ -76,7 +76,7 @@ class Amptools(cmdln.Cmdln):
                 help="Allowed difference between expected start of amplicon and start of read (default 10)")
 
     def do_clip(self, subcmd, opts, bamfile, design):
-        """${cmd_name}: Clip a set of amplicons
+        """${cmd_name}: Clip and filter a set of amplicons
 
             Clip reads from BAMFILE that match amplicon locations described in DESIGN.
             Design is expected to be delimited file that describes the amplicon and 
@@ -113,8 +113,10 @@ class Amptools(cmdln.Cmdln):
                 help="Trim reads that match amplicons")
 
     def do_mark(self, subcmd, opts, bamfile, design):
-        """ Mark reads that match amplicons using the AM tag and optionally trim
-            at the same time
+        """ Mark reads in bam file and optionally clip.
+            
+            ${cmd_usage}
+            ${cmd_option_list}
         """
         samfile = pysam.Samfile(bamfile, 'rb')
         stats = Stats(' '.join(sys.argv))        

@@ -11,6 +11,7 @@ class Stats(object):
         self._end_trims = Counter()
         self._matches = Counter()
         self.reads = 0
+        self.eids = []
         
     def start_trim(self, eid):
         self._start_trims[eid] += 1
@@ -28,7 +29,7 @@ class Stats(object):
         print(file=stream)
         writer = csv.writer(stream, delimiter='\t')
         writer.writerow('amplicon matches start_trims end_trims'.split())
-        for eid in sorted(set(self._start_trims.keys() + self._end_trims.keys() + self._matches.keys() )): 
+        for eid in sorted(self.eids): 
             writer.writerow([eid, 
                 str(self._matches[eid]), 
                 str(self._start_trims[eid]), 

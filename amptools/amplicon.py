@@ -47,6 +47,7 @@ class Amplicon(object):
         self.trim_end = trim_end
         self.stats = stats
         self.offset_allowed = offset_allowed
+        self.stats.eids.append(self.external_id)
         if load_pileups: 
             self.load_pileups(samfile)
 
