@@ -109,20 +109,28 @@ class Amptools(cmdln.Cmdln):
                   help="Output file (default stdout)")
     @cmdln.option("-b", "--offset-allowed", action="store", default=10,
                 help="Allowed difference between expected start of amplicon and start of read (default 10)")
+    @cmdln.option("-c", "--clip", action="store_true", 
+                help="Trim reads that match amplicons")
 
     def do_mark(self, subcmd, opts, bamfile, design):
-        """ Mark reads that match amplicons using the AM tag """
-        stats = Stats(' '.join(sys.argv))        
-        amplicons = load_amplicons(design, stats, opts)
-
+        """ Mark reads that match amplicons using the AM tag and optionally trim
+            at the same time
+        """
         samfile = pysam.Samfile(bamfile, 'rb')
+        stats = Stats(' '.join(sys.argv))        
+        amplicons = load_amplicons(design, stats, opts, samfile=samfile)
         outfile = pysam.Samfile(opts.outfile, 'wb', template=samfile)
 
+        # we need to reopen the file here to get sequential access after computin the pileups
+        samfile = pysam.Samfile(bamfile, 'rb')
         for read in samfile: 
             stats.reads += 1
+            
+            # TODO: optimisation of the list of amplicons that are considered
             for amp in amplicons:
                 if amp.matches(read):
                     read.tags = (read.tags or []) + [('AM', amp.external_id)]
+                    amp.clip(read)
             outfile.write(read) 
         
         stats.report(sys.stderr)

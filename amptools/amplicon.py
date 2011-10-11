@@ -9,7 +9,7 @@ from ucsc import Interval
 PILEUP_MAX_DEPTH = 200 * 1500
 
 
-def load_amplicons(design, stats, opts):
+def load_amplicons(design, stats, opts, samfile=None):
     amplicons = []
     for row in csv.DictReader(file(design, 'U'), delimiter=opts.delimiter): 
         amp_loc = Interval.from_string(row[opts.amplicon_column])
@@ -23,7 +23,8 @@ def load_amplicons(design, stats, opts):
             chr=amp_loc.chrom, start=amp_loc.start, end=amp_loc.end,
             trim_start = trim_loc.start, trim_end=trim_loc.end, 
             external_id = row[opts.id_column], stats = stats, 
-            offset_allowed=opts.offset_allowed
+            offset_allowed=opts.offset_allowed, 
+            load_pileups=opts.clip, samfile=samfile
         )
         amplicons.append(amplicon)
     return amplicons
@@ -35,7 +36,8 @@ class Amplicon(object):
         return '%s:%s-%s:%s' % (self.chr, self.start, self.end, self.strand)
     
     def __init__(self, external_id=None, chr=None, start=None, end=None, 
-        strand=None, trim_start=None, trim_end=None, stats=None, offset_allowed=10):
+        strand=None, trim_start=None, trim_end=None, stats=None, 
+        offset_allowed=10, load_pileups=False, samfile=None):
         self.external_id = external_id
         self.chr = chr
         self.start = start 
@@ -45,6 +47,13 @@ class Amplicon(object):
         self.trim_end = trim_end
         self.stats = stats
         self.offset_allowed = offset_allowed
+        if load_pileups: 
+            self.load_pileups(samfile)
+
+    def load_pileups(self, samfile):
+        """ compute the pileups at the trim point for this amplicon """
+        self.start_trim_dict = self.pileup_dict_at_position(samfile, self.trim_start)
+        self.end_trim_dict = self.pileup_dict_at_position(samfile, self.trim_end)
     
     def reads_from(self, samfile):
         """ Return an iterator of reads from this amplicon in the samfile """
@@ -83,14 +92,6 @@ class Amplicon(object):
             
         return pileup_dict
                                                                                             
-    def pileup_dict_at_start(self, samfile):
-        """ return a pileup at the trim start"""
-        if not self.trim_start: return {}
-        return self.pileup_dict_at_position(samfile, self.trim_start)
-    
-    def pileup_dict_at_end(self, samfile):
-        if not self.trim_end: return {}
-        return self.pileup_dict_at_position(samfile, self.trim_end)
     
     def clip(self, read):
         """ trim a read """
@@ -123,12 +124,8 @@ class Amplicon(object):
 
         return read
     
-    
     def clipped_reads(self, samfile):
         """ return all the reads of this amplicon clipped """
-
         reads = self.reads_from(samfile)
-        self.start_trim_dict = self.pileup_dict_at_start(samfile)
-        self.end_trim_dict = self.pileup_dict_at_end(samfile)
-        
+        self.load_pileups(samfile)
         return itertools.imap(self.clip, reads)
