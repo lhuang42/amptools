@@ -88,9 +88,8 @@ class Amptools(cmdln.Cmdln):
         """
         stats = Stats(' '.join(sys.argv))  
         opts.clip = False      
-        amplicons = load_amplicons(design, stats, opts)
-        
         samfile = pysam.Samfile(bamfile, 'rb')
+        amplicons = load_amplicons(design, stats, opts)        
         outfile = pysam.Samfile(opts.outfile, 'wb', template=samfile)
     
         for amplicon in amplicons: 
