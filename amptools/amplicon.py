@@ -94,7 +94,7 @@ class Amplicon(object):
         return pileup_dict
                                                                                             
     
-    def clip(self, read, mark=False):
+    def clip(self, read):
         """ trim a read """
         
         first_base_pos = self.start_trim_dict.get(read.qname, 0)
@@ -123,13 +123,17 @@ class Amplicon(object):
             read.qual = qual[:last_base_pos]
             read.cigar = cigar.trim_cigar(cig, len(read.seq))
 
-        if mark:
-            read.tags = (read.tags or []) + [('AM', self.external_id)]
-
         return read
     
-    def clipped_reads(self, samfile):
+    def mark(self, read):
+        read.tags = (read.tags or []) + [('AM', self.external_id)]
+        return read
+    
+    def clipped_reads(self, samfile, mark=True):
         """ return all the reads of this amplicon clipped """
         reads = self.reads_from(samfile)
         self.load_pileups(samfile)
-        return itertools.imap(self.clip, reads)
+        reads = itertools.imap(self.clip, reads)
+        if mark: 
+            reads = itertools.imap(self.mark, reads)
+        return reads

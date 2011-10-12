@@ -2,9 +2,11 @@ from __future__ import print_function
 
 import sys
 import csv
+import itertools
 import cmdln
+from collections import Counter, namedtuple
 import pysam
-from amplicon import Amplicon, load_amplicons
+from amplicon import Amplicon, load_amplicons, PILEUP_MAX_DEPTH
 from ucsc import Interval    
 from stats import Stats
 
@@ -132,9 +134,63 @@ class Amptools(cmdln.Cmdln):
             # TODO: optimisation of the list of amplicons that are considered
             for amp in amplicons:
                 if amp.matches(read):
-                    read.tags = (read.tags or []) + [('AM', amp.external_id)]
                     amp.clip(read)
+                    amp.mark(read)
             outfile.write(read) 
         
         stats.report(sys.stderr)
+
+    
+    
+    def do_allele_balance(self, subcmd, opts, bamfile, position):
+        """ Report allele balances at each site 
+        
+            ${cmd_usage}
+            ${cmd_option_list}  
+        """
+        samfile = pysam.Samfile(bamfile, 'rb')
+        position = position.split(':')
+        chrom, base = position[0], int(position[1])
+        
+        counts = Counter()
+        
+        starts = {}
+        ends = {}
+        
+        Obs = namedtuple('Observation', ['rg', 'amp', 'base'])
+        
+        for puc in samfile.pileup(chrom, base, base+1, max_depth=PILEUP_MAX_DEPTH):
+            
+            if puc.pos == base:
+                for pu in puc.pileups:
+                    starts[pu.alignment.qname] = pu.qpos
+            
+            if puc.pos == base+1:
+                for pu in puc.pileups:
+                    spos = starts.get(pu.alignment.qname, None)
+                    if spos is None: 
+                        continue                    
+                    tags = dict(pu.alignment.tags)
+                    insert = pu.alignment.query[spos+1:pu.qpos] or '-'
+                    
+                    observation = Obs(
+                        rg=tags.get('RG', None), amp=tags.get('AM', None), base=insert)
+                    counts[observation] += 1
+
+            # for pu in puc.pileups:
+            #     tags = dict(pu.alignment.tags)
+            #     observation = tags.get('RG', None), tags.get('AM', None), pu.alignment.query[pu.qpos] 
+            #     counts[observation] += 1
+            
+        
+        alleles = sorted(set([x.base for x in counts]))
+        amps = sorted(set([x.amp for x in counts]))
+        rgs = sorted(set([x.rg  for x in counts]))
+        
+        print('rg', 'amplicon', *alleles)
+        for rg in rgs: 
+            for amp in amps: 
+                freqs = [counts[Obs(rg=rg,amp=amp,base=b)] for b in alleles]
+                print(rg, amp, *freqs)
+                
         
