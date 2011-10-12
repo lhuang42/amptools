@@ -36,8 +36,9 @@ class Stats(object):
                 str(self._end_trims[eid])])
             
         reads = self.reads
-        matched = sum(self._matches.values())
-        matched_pc = 100 * matched / reads
-        print(file=stream)
-        print("matched %(matched)s/%(reads)s %(matched_pc).2f%% of alignments" % locals(), file=stream)
+        if reads: 
+            matched = sum(self._matches.values())
+            matched_pc = 100 * matched / reads
+            print(file=stream)
+            print("matched %(matched)s/%(reads)s %(matched_pc).2f%% of alignments" % locals(), file=stream)
     
