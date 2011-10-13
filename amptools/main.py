@@ -8,7 +8,8 @@ from collections import Counter, namedtuple
 import pysam
 from amplicon import Amplicon, load_amplicons, PILEUP_MAX_DEPTH
 from ucsc import Interval    
-from stats import Stats
+from stats import Stats, bias_test
+import vcf
 
 class Amptools(cmdln.Cmdln):
     """Usage:
@@ -135,7 +136,7 @@ class Amptools(cmdln.Cmdln):
             for amp in amplicons:
                 if amp.matches(read):
                     amp.clip(read)
-                    amp.mark(read)
+                    amp.mark(read7)
             outfile.write(read) 
         
         stats.report(sys.stderr)
@@ -194,3 +195,15 @@ class Amptools(cmdln.Cmdln):
                 print(rg, amp, *freqs)
                 
         
+
+    def do_filter_vcf(self, subcmd, opts, vcffile):
+        for line in file(vcffile):
+            if line.startswith('#'): 
+                sys.stdout.write(line)
+                
+            else: 
+                line = vcf.apply_filters(line)
+                sys.stdout.write(line)
+ 
+                        
+                

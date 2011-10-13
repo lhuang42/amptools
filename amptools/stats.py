@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 from collections import Counter
 import csv
+from rpy2 import robjects
 
 class Stats(object):
     
@@ -41,4 +42,47 @@ class Stats(object):
             matched_pc = 100 * matched / reads
             print(file=stream)
             print("matched %(matched)s/%(reads)s %(matched_pc).2f%% of alignments" % locals(), file=stream)
+    
+
+
+ll_test = robjects.r('''
+function(ra, aa, gt, diag=F) {
+    ra_sum = sum(ra)
+    aa_sum = sum(aa)
+    ab = aa_sum / (ra_sum + aa_sum)
+    gtp = 0.05 + (0.9*gt/2)
+    
+    
+    error_likelihood = log(dbinom(aa, ra+aa, ab))
+    gt_likelihood = log(dbinom(aa, ra+aa, gtp))
+    
+    if (diag) {     
+        print(ra)
+        print(aa)
+        print(gtp)
+        print(ab)
+        print(error_likelihood)
+        print(gt_likelihood)
+    }
+    error_likelihood = sum(error_likelihood)
+    gt_likelihood = sum(gt_likelihood)
+    if (F) { 
+        print(error_likelihood)
+        print(gt_likelihood)
+        
+        print(exp(error_likelihood))
+        print(exp(gt_likelihood))
+    }
+    c(error_likelihood - gt_likelihood, ab)
+}
+''')
+
+def bias_test(calls): 
+    
+    ra = robjects.IntVector([x['RA'] for x in calls])
+    aa = robjects.IntVector([x['AA'] for x in calls])
+    gt = robjects.IntVector(map(sum, [x['GT'] for x in calls]))
+    test_val, ab = ll_test(ra, aa, gt)
+    # print('test value -ve prefers gt, +ve prefers error', test_val, test_val < 0)
+    return test_val < 0, test_val, ab
     
