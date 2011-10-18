@@ -1,14 +1,18 @@
 from __future__ import print_function
 
 import sys
+import  os
 import csv
+import string
 import itertools
-import cmdln
 from collections import Counter, namedtuple
+
+import cmdln
 import pysam
-from amplicon import Amplicon, load_amplicons, PILEUP_MAX_DEPTH
 from ucsc import Interval    
-from stats import Stats, bias_test
+
+from amplicon import Amplicon, load_amplicons, PILEUP_MAX_DEPTH
+from stats import Stats, bias_test, neg_binom_fit
 import vcf
 
 class Amptools(cmdln.Cmdln):
@@ -150,49 +154,71 @@ class Amptools(cmdln.Cmdln):
             ${cmd_option_list}  
         """
         samfile = pysam.Samfile(bamfile, 'rb')
-        position = position.split(':')
-        chrom, base = position[0], int(position[1])
         
-        counts = Counter()
         
-        starts = {}
-        ends = {}
-        
-        Obs = namedtuple('Observation', ['rg', 'amp', 'base'])
-        
-        for puc in samfile.pileup(chrom, base, base+1, max_depth=PILEUP_MAX_DEPTH):
-            
-            if puc.pos == base:
-                for pu in puc.pileups:
-                    starts[pu.alignment.qname] = pu.qpos
-            
-            if puc.pos == base+1:
-                for pu in puc.pileups:
-                    spos = starts.get(pu.alignment.qname, None)
-                    if spos is None: 
-                        continue                    
-                    tags = dict(pu.alignment.tags)
-                    insert = pu.alignment.query[spos+1:pu.qpos] or '-'
-                    
-                    observation = Obs(
-                        rg=tags.get('RG', None), amp=tags.get('AM', None), base=insert)
-                    counts[observation] += 1
+        if os.path.exists(position): 
+            positions = []
+            for line in file(position):
+                if not line.startswith('#'):
+                    fields = vcf.parse_fields(line)
+                    positions.append((fields.CHROM, int(fields.POS), fields.REF, fields.ALT))
+        else: 
+            positions = [position.split(':')]
 
-            # for pu in puc.pileups:
-            #     tags = dict(pu.alignment.tags)
-            #     observation = tags.get('RG', None), tags.get('AM', None), pu.alignment.query[pu.qpos] 
-            #     counts[observation] += 1
+        print('chrom', 'pos', 'rg', 'amplicon', 'ref', 'alt')
+
+        for position in positions: 
+            chrom, base, ref, alt = position
+        
+            counts = Counter()
+        
+            starts = {}
+            ends = {}
+        
+            Obs = namedtuple('Observation', ['rg', 'amp', 'base'])
+            
+            
+            for puc in samfile.pileup(chrom, base, base+1, max_depth=PILEUP_MAX_DEPTH):
+            
+                if puc.pos == base - 1: # why??
+                    # for pu in puc.pileups:
+                    #                     starts[pu.alignment.qname] = pu.qpos    
+                    #                 
+                    for pu in puc.pileups:
+                        tags = dict(pu.alignment.tags)
+                        observation = Obs(
+                            rg=tags.get('RG', None), 
+                            amp=tags.get('AM', None), 
+                            base=pu.alignment.query[pu.qpos])               
+                        counts[observation] += 1
+            
+                # if puc.pos == base+1:
+                #     for pu in puc.pileups:
+                #         spos = starts.get(pu.alignment.qname, None)
+                #         if spos is None: 
+                #             continue                    
+                #         tags = dict(pu.alignment.tags)
+                #         insert = pu.alignment.query[spos+1:pu.qpos] or '-'
+                #         
+                #         observation = Obs(
+                #             rg=tags.get('RG', None), amp=tags.get('AM', None), base=insert)
+                #         counts[observation] += 1
+
+                # for pu in puc.pileups:
+                #     tags = dict(pu.alignment.tags)
+                #     observation = tags.get('RG', None), tags.get('AM', None), pu.alignment.query[pu.qpos] 
+                #     counts[observation] += 1
             
         
-        alleles = sorted(set([x.base for x in counts]))
-        amps = sorted(set([x.amp for x in counts]))
-        rgs = sorted(set([x.rg  for x in counts]))
+            alleles = sorted(set([x.base for x in counts]))
+            amps = sorted(set([x.amp for x in counts]))
+            rgs = sorted(set([x.rg  for x in counts]))
         
-        print('rg', 'amplicon', *alleles)
-        for rg in rgs: 
-            for amp in amps: 
-                freqs = [counts[Obs(rg=rg,amp=amp,base=b)] for b in alleles]
-                print(rg, amp, *freqs)
+            
+            for rg in rgs: 
+                for amp in amps: 
+                    freqs = [counts[Obs(rg=rg,amp=amp,base=b)] for b in (ref, alt)]
+                    print(chrom, base, rg, amp, *freqs)
                 
         
 
@@ -204,6 +230,63 @@ class Amptools(cmdln.Cmdln):
             else: 
                 line = vcf.apply_filters(line)
                 sys.stdout.write(line)
- 
-                        
+
+    
+    @cmdln.option("-o", "--outfile", action="store", default=None,
+                      help="Output file (default stdout)")
+    def do_dispersion(self, subcmd, opts, bamfile, rgs, amps):
+        if opts.outfile: 
+            opts.outfile = file(opts.outfile)
+        
+        target_counts = Counter()
+        rg_counts = Counter()
+        am_counts = Counter()
+        
+        amps = map(string.rstrip, file(amps))
+        rgs = map(string.rstrip, file(rgs))
+        
+        for rg in rgs: 
+            rg_counts[rg] = 0
+            for am in amps :
+                target_counts[(rg, am)] = 0
+                am_counts[am] = 0
+        
+        samfile = pysam.Samfile(bamfile, 'rb')
+        for read in samfile: 
+            tags = dict(read.tags)
+            rg = tags.get('RG', None)
+            am = tags.get('AM', None)
+            
+            # ignore undelclared amps
+            if rg not in rgs or am not in amps: 
+                continue
+            
+            if rg is None or am is None:
+                continue
                 
+            target_counts[(rg, am)] += 1
+            rg_counts[rg] += 1 
+            am_counts[am] += 1
+            
+        if opts.outfile: 
+            for (rg, am), count in target_counts.items():
+                p            
+            
+        print('Targets:\n======')
+        neg_binom_fit(target_counts.values())
+        print('Amplicons:\n=======')
+        neg_binom_fit(am_counts.values())
+        print('Samples:\n========')
+        neg_binom_fit(rg_counts.values())
+
+
+        missing_amps = Counter()
+        for (rg, am), v in target_counts.items():
+            if v == 0: 
+                missing_amps[am] += 1
+        
+        print('Amplicons with zero reads:\n========')
+        for am, missed in missing_amps.items():
+            print("Amplicon %(am)s missing %(missed)s samples" % locals())
+            
+            

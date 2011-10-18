@@ -3,6 +3,7 @@ from __future__ import print_function, division
 from collections import Counter
 import csv
 from rpy2 import robjects
+from rpy2.robjects.packages import importr
 
 class Stats(object):
     
@@ -85,4 +86,15 @@ def bias_test(calls):
     test_val, ab = ll_test(ra, aa, gt)
     # print('test value -ve prefers gt, +ve prefers error', test_val, test_val < 0)
     return test_val < 0, test_val, ab
+    
+def neg_binom_fit(reads):
+    robjects.r.options(warn=-1)
+    reads = robjects.IntVector(reads)
+    mass = importr('MASS')
+    fit = mass.fitdistr(reads, 'negative binomial')
+    print('Negative binomial fit:')
+    print(fit)
+    qvals = robjects.FloatVector([0,0.01,0.05,0.1,0.25,0.5])
+    print('Quantiles:')
+    print(robjects.r.quantile(reads, qvals))
     
