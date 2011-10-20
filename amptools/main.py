@@ -32,7 +32,7 @@ class Amptools(cmdln.Cmdln):
     @cmdln.option("-t", "--trim-column", action="store", default='trim_location',
                 help="Column for trim location in design file (default 'trim_location')")
     @cmdln.option("-i", "--id-column", action="store", default='id',
-                help="Column for trim location in design file (default 'trim_location')")
+                help="Column for amplicon identifier in design file (default 'external_id')")
     @cmdln.option("-o", "--outfile", action="store", default='-',
                   help="Output file (default stdout)")
     @cmdln.option("-b", "--offset-allowed", action="store", default=10,
