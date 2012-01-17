@@ -140,7 +140,7 @@ class Amptools(cmdln.Cmdln):
             for amp in amplicons:
                 if amp.matches(read):
                     amp.clip(read)
-                    amp.mark(read7)
+                    amp.mark(read)
             outfile.write(read) 
         
         stats.report(sys.stderr)
