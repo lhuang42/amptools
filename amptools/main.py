@@ -10,10 +10,11 @@ from collections import Counter, namedtuple
 import cmdln
 import pysam
 from ucsc import Interval    
+import vcf
 
 from amplicon import Amplicon, load_amplicons, PILEUP_MAX_DEPTH
-from stats import Stats, bias_test, neg_binom_fit
-import vcf
+from stats import Stats, bias_test, neg_binom_fit, check_amplicon_bias
+import util
 
 class Amptools(cmdln.Cmdln):
     """Usage:
@@ -146,98 +147,91 @@ class Amptools(cmdln.Cmdln):
         stats.report(sys.stderr)
 
     
-    
-    def do_allele_balance(self, subcmd, opts, bamfile, position):
+    @cmdln.option("-d", "--delimiter", action="store", default=',',
+                  help="Delimiter for design file (default ,)")
+    @cmdln.option("-a", "--amplicon-column", action="store", default='amplicon_location',
+                help="Column for amplicons in design file (default 'amplicon_location')")
+    @cmdln.option("-t", "--trim-column", action="store", default='trim_location',
+                help="Column for trim location in design file (default 'trim_location')")
+    @cmdln.option("-i", "--id-column", action="store", default='id',
+                help="Column for trim location in design file (default 'trim_location')")
+    @cmdln.option("-b", "--offset-allowed", action="store", default=10,
+                help="Allowed difference between expected start of amplicon and start of read (default 10)")
+    def do_allele_balance(self, subcmd, opts, bam, positions, design, outvcf):
         """ Report allele balances at each site 
         
             ${cmd_usage}
             ${cmd_option_list}  
         """
-        samfile = pysam.Samfile(bamfile, 'rb')
-        
-        
-        if os.path.exists(position): 
-            positions = []
-            for line in file(position):
-                if not line.startswith('#'):
-                    fields = vcf.parse_fields(line)
-                    positions.append((fields.CHROM, int(fields.POS), fields.REF, fields.ALT))
+        opts.clip = False
+        samfile = pysam.Samfile(bam, 'rb')        
+        stats = Stats(' '.join(sys.argv))        
+        amplicons = load_amplicons(design, stats, opts, samfile=samfile)
+        amplicons = dict([(x.external_id, x) for x in amplicons])
+        if os.path.exists(positions): 
+            positions = vcf.VCFReader(file(positions))
         else: 
             positions = [position.split(':')]
+            
+        writer = vcf.VCFWriter(file(outvcf, 'w'), template=positions)
 
-        print('chrom', 'pos', 'rg', 'amplicon', 'ref', 'alt')
+        print('chrom', 'pos', 'rg', 'amplicon', 'read.pos', 'ref', 'alt')
+
+        amplicon_problems = Counter()
 
         for position in positions: 
-            chrom, base, ref, alt = position
-        
-            counts = Counter()
-        
-            starts = {}
-            ends = {}
-        
-            Obs = namedtuple('Observation', ['rg', 'amp', 'base'])
-            
-            
-            for puc in samfile.pileup(chrom, base, base+1, max_depth=PILEUP_MAX_DEPTH):
-            
-                if puc.pos == base - 1: # why??
-                    # for pu in puc.pileups:
-                    #                     starts[pu.alignment.qname] = pu.qpos    
-                    #                 
-                    for pu in puc.pileups:
-                        tags = dict(pu.alignment.tags)
-                        observation = Obs(
-                            rg=tags.get('RG', None), 
-                            amp=tags.get('AM', None), 
-                            base=pu.alignment.query[pu.qpos])               
-                        counts[observation] += 1
-            
-                # if puc.pos == base+1:
-                #     for pu in puc.pileups:
-                #         spos = starts.get(pu.alignment.qname, None)
-                #         if spos is None: 
-                #             continue                    
-                #         tags = dict(pu.alignment.tags)
-                #         insert = pu.alignment.query[spos+1:pu.qpos] or '-'
-                #         
-                #         observation = Obs(
-                #             rg=tags.get('RG', None), amp=tags.get('AM', None), base=insert)
-                #         counts[observation] += 1
-
-                # for pu in puc.pileups:
-                #     tags = dict(pu.alignment.tags)
-                #     observation = tags.get('RG', None), tags.get('AM', None), pu.alignment.query[pu.qpos] 
-                #     counts[observation] += 1
-            
-        
-            alleles = sorted(set([x.base for x in counts]))
+            try:
+                counts = util.amplicon_distribution(position, samfile)
+            except NotImplementedError:
+                continue
+            alleles = sorted(set([x.is_ref for x in counts]))
             amps = sorted(set([x.amp for x in counts]))
             rgs = sorted(set([x.rg  for x in counts]))
-        
+            
+            # update the VCF record
+            check_amplicon_bias(position.samples, counts, amps, amplicon_problems)
+            position.add_format('AMPC')
+            position.add_format('AMPS')
+            writer.write_record(position)
+            
+            # print diagnostic
+            gtypes = position.sample_lookup()
             
             for rg in rgs: 
                 for amp in amps: 
-                    freqs = [counts[Obs(rg=rg,amp=amp,base=b)] for b in (ref, alt)]
-                    print(chrom, base, rg, amp, *freqs)
+                    amplicon = amplicons[amp]
+                    
+                    if amplicon.strand > 0 : 
+                        read_distance = position.POS - amplicon.start
+                    elif amplicon.strand < 0 : 
+                        read_distance = amplicon.end - position.POS
+                    else: 
+                        read_distance = None
+                    
+                    freqs = [counts[util.Obs(rg=rg,amp=amp,is_ref=b)] for b in (True, False)]
+                    if gtypes[rg]['GT'] != "0/0":
+                        print(position.CHROM, position.POS, position.REF, position.ALT, rg, gtypes[rg]['GT'], amp, read_distance, *freqs)
                 
+        print('*' * 80 )
+        print('Amplicon disagreements')
+        for amp, count in amplicon_problems.items(): 
+            print(amp, count)
         
 
     def do_filter_vcf(self, subcmd, opts, vcffile):
-        for line in file(vcffile):
-            if line.startswith('#'): 
-                sys.stdout.write(line)
-                
-            else: 
-                line = vcf.apply_filters(line)
-                sys.stdout.write(line)
-
+        reader = vcf.VCFReader(file(vcffile))
+        writer = vcf.VCFWriter(sys.stdout, template=reader)
+        for entry in reader: 
+            util.apply_filters(entry)
+            writer.write_record(entry)
     
     @cmdln.option("-o", "--outfile", action="store", default=None,
                       help="Output file (default stdout)")
     def do_dispersion(self, subcmd, opts, bamfile, rgs, amps):
         if opts.outfile: 
-            opts.outfile = file(opts.outfile)
-        
+            opts.outfile = file(opts.outfile, 'w')
+            print('sample', 'amplicon', 'reads', file=opts.outfile)
+            
         target_counts = Counter()
         rg_counts = Counter()
         am_counts = Counter()
@@ -270,7 +264,7 @@ class Amptools(cmdln.Cmdln):
             
         if opts.outfile: 
             for (rg, am), count in target_counts.items():
-                p            
+                print(rg, am, count, file=opts.outfile)
             
         print('Targets:\n======')
         neg_binom_fit(target_counts.values())
@@ -289,4 +283,20 @@ class Amptools(cmdln.Cmdln):
         for am, missed in missing_amps.items():
             print("Amplicon %(am)s missing %(missed)s samples" % locals())
             
-            
+    
+    def do_coverage(self, subcmd, opts, loc, bamfile, rgs):
+        samfile = pysam.Samfile(bamfile, 'rb')
+        loc = Interval.from_string(loc)
+        rgs = map(string.rstrip, file(rgs))
+        
+        print('chr', 'pos', 'sample', 'depth')
+        for puc in samfile.pileup(loc.chrom, loc.start, loc.end, max_depth=PILEUP_MAX_DEPTH):
+            pos = puc.pos
+            counter = Counter()
+            for pu in puc.pileups:
+                rg = dict(pu.alignment.tags)['RG']
+                counter[rg] += 1
+            for rg in rgs: 
+                print(loc.chrom, pos, rg, counter[rg])
+                
+  
