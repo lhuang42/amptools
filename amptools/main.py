@@ -10,6 +10,7 @@ subparsers = parser.add_subparsers(help='sub-command help')
 parser_a = subparsers.add_parser('annotate', help='annotate a bam file')
 parser_a.add_argument('input', type=str, help='input file')
 annotate.MidAnnotator.customize_parser(parser_a)
+annotate.AmpliconAnnotator.customize_parser(parser_a)
 parser_a.set_defaults(func=annotate.annotate)
 
 
