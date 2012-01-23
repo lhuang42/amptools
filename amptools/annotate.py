@@ -40,6 +40,7 @@ class MidAnnotator(object):
         # update the header
         RGS = []
         for mid in self.mids.values():
+            # TODO: insert Plaform here
             RGS.append({'RG': mid, 'SM': mid})
         header['RG'] = RGS
 
@@ -106,15 +107,21 @@ class AmpliconAnnotator(object):
 
         AMS = []
         for amp in self.amplicons:
-            AMS.append({'ID': amp.external_id})
+            AMS.append({
+                'ID': amp.external_id,
+                'LO': '%s:%s-%s' % (amp.chr, amp.start, amp.end),
+                'ST': str(amp.strand)
+                })
 
-        header['AM'] = AMS
-
+        header['EA'] = AMS
 
     def __call__(self, read):
         for amp in self.amplicons:
             if amp.matches(read):
-                read.tags = read.tags + [('AI', amp.external_id)]
+                # FIXME: prevent duplicate annotation
+                # FIXME: amplicon mark method
+                # FIXME: short circuit
+                read.tags = read.tags + [('EA', amp.external_id)]
                 return read
 
 
@@ -184,7 +191,6 @@ def duplicates(args):
 
             ordered = sorted(dups, key=keyfunc)
             for not_best in ordered[:-1]:
-                print not_best.qname
                 not_best.is_duplicate = True
                 yield not_best
             # mark duplicates
@@ -233,7 +239,6 @@ def duplicates(args):
 
         for nondup in filter_dups(group, current):
             outp.write(nondup)
-    print i, n
 
 
 

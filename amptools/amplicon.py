@@ -131,7 +131,7 @@ class Amplicon(object):
         return read
 
     def mark(self, read):
-        read.tags = (read.tags or []) + [('AM', self.external_id)]
+        read.tags = (read.tags or []) + [('EA', self.external_id)]
         return read
 
     def clipped_reads(self, samfile, mark=True):
@@ -139,6 +139,6 @@ class Amplicon(object):
         reads = self.reads_from(samfile)
         self.load_pileups(samfile)
         reads = itertools.imap(self.clip, reads)
-        if mark:
-            reads = itertools.imap(self.mark, reads)
+        #if mark:
+        #    reads = itertools.imap(self.mark, reads)
         return reads
