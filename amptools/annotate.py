@@ -1,5 +1,6 @@
 import sys
 import itertools
+import random
 from collections import Counter
 
 import pysam
@@ -44,7 +45,7 @@ class MidAnnotator(object):
         read_mid = self.read_mids[read.qname]
         RG = self.match_read(read_mid)
 
-        read.tags = read.tags + [('RG', RG), ('MI', read_mid)]
+        read.tags = read.tags + [('RG', RG), ('BC', read_mid)]
         self.counts[RG] += 1
 
     def report(self):
@@ -99,7 +100,7 @@ class AmpliconAnnotator(object):
     def __call__(self, read):
         for amp in self.amplicons:
             if amp.matches(read):
-                read.tags = read.tags + [('AM', amp.external_id)]
+                read.tags = read.tags + [('AI', amp.external_id)]
                 return read
 
 
@@ -127,5 +128,96 @@ def annotate(args):
 
     for a in annotators:
         a.report()
+
+
+def duplicates(args):
+    inp = pysam.Samfile(args.input, "rb" )
+    outp = pysam.Samfile(args.output, "wb", template=inp)
+
+    # TODO: check sorted
+
+    current_pos = None
+    to_check = {}
+
+    def filter_dups(group, positions):
+        """ filter a set of start positions for the best read by mapping quality """
+        entries = []
+        for pos in current:
+            entries.extend(to_check.pop((group[0], group[1], pos)))
+
+        # hash based on the RG and the DBR
+        groups = {}
+        for e in entries:
+            rg, dbr = e.opt('RG'), e.opt('DB')
+
+            # FIXME: parameterize this DBR validation code
+            if len(dbr) != 3 or 'N' in dbr:
+                continue
+
+            group = (rg, dbr)
+            groups[group] = groups.get(group, []) + [e]
+
+        # return the best read in each group
+        for dups in groups.values():
+
+            # FIXME: option to choose best read stratedy
+            keyfunc = lambda x: x.mapq
+            #if opts.length:
+            #    keyfunc = lambda x: x.qlen
+
+            ordered = sorted(dups, key=keyfunc)
+            for not_best in ordered[:-1]:
+                print not_best.qname
+                not_best.is_duplicate = True
+                yield not_best
+            # mark duplicates
+
+            yield ordered[-1]
+
+
+    n=0
+    for (i, entry) in enumerate(inp):
+        if (i % 10000) == 0:
+            print('processed %(i)s reads' % locals())
+
+        #if args.random and random.random() > args.random:
+        #    continue
+        n+=1
+        is_reverse = entry.is_reverse
+        start = entry.pos if not is_reverse else entry.aend
+
+        position_index = (entry.rname, is_reverse, start)
+        to_check[position_index] = to_check.get(position_index, []) + [entry]
+
+        if entry.pos != current_pos:
+            current_pos = entry.pos
+
+            # could process some of the reads when the reference changes
+            # if entry.rname != rname: PASS
+
+            # find positions near enough to be the same read and hand off to filter
+    merge_distance = 4
+    indexes = sorted(to_check.keys())
+    for group, inds in itertools.groupby(indexes, key=lambda x: x[:2]):
+        #log.debug('processing group %(group)s' % locals())
+        positions = [x[2] for x in inds]
+        current = [positions.pop(0)]
+        while positions:
+            head = current[-1]
+            consider = positions[0]
+            #log.debug('head is %(head)s, considering %(consider)s' % locals())
+            if abs(consider - head) <= merge_distance:
+                current.append(positions.pop(0))
+            else:
+                #log.debug('deduping %(current)s' % locals())
+                for nondup in filter_dups(group, positions):
+                    outp.write(nondup)
+                current = [positions.pop(0)]
+
+        for nondup in filter_dups(group, current):
+            outp.write(nondup)
+    print i, n
+
+
 
 

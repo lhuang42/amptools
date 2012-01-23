@@ -29,7 +29,8 @@ class AmpliconClipper(object):
             for t in trimmed:
                 outfile.write(t)
                 clipped[t.qname] = True
-        for r in samfile:
+
+        for r in samfile.fetch():
             if r.qname not in clipped:
                 outfile.write(r)
 
@@ -41,3 +42,4 @@ def clip(args):
     clipper = AmpliconClipper(args)
     clipper(inp, oup)
     clipper.stats.report(sys.stdout)
+

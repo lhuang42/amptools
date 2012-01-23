@@ -17,6 +17,12 @@ annotate.AmpliconAnnotator.customize_parser(parser_a)
 annotate.DbrAnnotator.customize_parser(parser_a)
 parser_a.set_defaults(func=annotate.annotate)
 
+
+parser_c = subparsers.add_parser('duplicates', help='annotate a bam file')
+parser_c.add_argument('input', type=str, help='input file')
+parser_c.add_argument('--output', type=str, help='output file', default='-')
+parser_c.set_defaults(func=annotate.duplicates)
+
 parser_b = subparsers.add_parser('clip', help='clip help')
 parser_b.add_argument('input', type=str, help='input file')
 parser_b.add_argument('--output', type=str, help='output file', default='-')
