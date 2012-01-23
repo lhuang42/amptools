@@ -18,7 +18,7 @@ class MidAnnotator(object):
         parser.add_argument('--trim', type=str, help='trim file')
 
 
-    def __init__(self, args):
+    def __init__(self, args, header):
 
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
@@ -36,6 +36,13 @@ class MidAnnotator(object):
 
         self.mids = dict(mids)
         self.counts = dict([(x,0) for x in self.mids.values()])
+
+        # update the header
+        RGS = []
+        for mid in self.mids.values():
+            RGS.append({'RG': mid, 'SM': mid})
+        header['RG'] = RGS
+
 
     def match_read(self, read_mid):
         return self.mids[read_mid]
@@ -63,7 +70,7 @@ class DbrAnnotator(object):
     def customize_parser(cls, parser):
         parser.add_argument('--dbrs', type=str, help='dbr file')
 
-    def __init__(self, args):
+    def __init__(self, args, header):
 
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
@@ -93,9 +100,16 @@ class AmpliconAnnotator(object):
         parser.add_argument('--clip', action='store_true')
 
 
-    def __init__(self, args):
+    def __init__(self, args, header):
         self.stats = stats.Stats('')
         self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
+
+        AMS = []
+        for amp in self.amplicons:
+            AMS.append({'ID': amp.external_id})
+
+        header['AM'] = AMS
+
 
     def __call__(self, read):
         for amp in self.amplicons:
@@ -109,16 +123,19 @@ class AmpliconAnnotator(object):
 
 
 def annotate(args):
-    inp = pysam.Samfile(args.input, 'rb')
-    oup = pysam.Samfile(args.output, 'wb', template=inp)
+    inp = pysam.Samfile(args.input)
 
+    header = inp.header
     annotators = []
     if args.amps:
-        annotators.append(AmpliconAnnotator(args))
+        annotators.append(AmpliconAnnotator(args, header))
     if args.mids:
-        annotators.append(MidAnnotator(args))
+        annotators.append(MidAnnotator(args, header))
     if args.dbrs:
-        annotators.append(DbrAnnotator(args))
+        annotators.append(DbrAnnotator(args, header))
+
+    assert 'SQ' in header # http://code.google.com/p/pysam/issues/detail?id=84
+    oup = pysam.Samfile(args.output, 'wb', header=header)
 
     for read in inp:
         for annotator in annotators:

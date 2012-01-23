@@ -72,8 +72,8 @@ def run_map():
 exists = os.path.exists
 if not exists(REF): make_reference()
 if not exists(READS): make_reads()
-trim_reads()
-run_map()
+if not exists('trim.fa'): trim_reads()
+if not exists('raw_map.bam'): run_map()
 
 os.system('amptools annotate --mid mids.txt --trim trim.txt --amps amps.txt --dbrs trim.txt --output anno.bam_ raw_map.bam')
 os.system('samtools sort anno.bam_ anno')
