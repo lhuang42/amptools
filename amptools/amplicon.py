@@ -48,7 +48,7 @@ class Amplicon(object):
         self.trim_end = trim_end
         self.stats = stats
         self.offset_allowed = offset_allowed
-        #self.stats.eids.append(self.external_id)
+        self.stats.eids.append(self.external_id)
         if load_pileups:
             self.load_pileups(samfile)
 
@@ -76,8 +76,8 @@ class Amplicon(object):
         else:
             match = start_correct or end_correct
 
-        #if match:
-        #    self.stats.match(self.external_id)
+        if match:
+            self.stats.match(self.external_id)
 
         return match
 
@@ -107,7 +107,8 @@ class Amplicon(object):
         if first_base_pos:
             self.stats.start_trim(self.external_id)
             read.seq = seq[first_base_pos:]
-            read.qual = qual[first_base_pos:]
+            if qual:
+                read.qual = qual[first_base_pos:]
             read.cigar = cigar.trim_cigar(cig, len(read.seq), start=True)
             read.pos = end_pos - cigar.ref_length(read.cigar)
             assert read.aend == end_pos
@@ -121,7 +122,8 @@ class Amplicon(object):
         if last_base_pos != -1:
             self.stats.end_trim(self.external_id)
             read.seq = seq[:last_base_pos]
-            read.qual = qual[:last_base_pos]
+            if qual:
+                read.qual = qual[:last_base_pos]
             read.cigar = cigar.trim_cigar(cig, len(read.seq))
 
         return read
