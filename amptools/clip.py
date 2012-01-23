@@ -10,9 +10,9 @@ class AmpliconClipper(object):
     @classmethod
     def customize_parser(self, parser):
         parser.add_argument('--amps', type=str, help='amps file')
-        parser.add_argument('--id_column', type=str, help='amps file', default='id')
-        parser.add_argument('--amplicon_column', type=str, help='amps file', default='amplicon')
-        parser.add_argument('--trim_column', type=str, help='amps file', default='trim')
+        parser.add_argument('--id-column', type=str, help='amps file', default='id')
+        parser.add_argument('--amplicon-column', type=str, help='amps file', default='amplicon')
+        parser.add_argument('--trim-column', type=str, help='amps file', default='trim')
         parser.add_argument('--delimiter', type=str, help='file', default='\t')
         parser.add_argument('--offset-allowed', type=int, help='file', default=10)
         parser.add_argument('--clip', action='store_true')

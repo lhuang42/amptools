@@ -56,6 +56,8 @@ class Amplicon(object):
         """ compute the pileups at the trim point for this amplicon """
         self.start_trim_dict = self.pileup_dict_at_position(samfile, self.trim_start)
         self.end_trim_dict = self.pileup_dict_at_position(samfile, self.trim_end)
+        print('trim dict sizes', len(self.start_trim_dict), len(self.end_trim_dict))
+
 
     def reads_from(self, samfile):
         """ Return an iterator of reads from this amplicon in the samfile """
