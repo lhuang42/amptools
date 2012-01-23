@@ -23,9 +23,15 @@ class AmpliconClipper(object):
         self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
 
     def __call__(self, samfile, outfile):
-       for amplicon in self.amplicons:
-           trimmed = amplicon.clipped_reads(samfile)
-           map(outfile.write, trimmed)
+        clipped = {}
+        for amplicon in self.amplicons:
+            trimmed = amplicon.clipped_reads(samfile)
+            for t in trimmed:
+                outfile.write(t)
+                clipped[t.qname] = True
+        for r in samfile:
+            if r.qname not in clipped:
+                outfile.write(r)
 
 
 def clip(args):

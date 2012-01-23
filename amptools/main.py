@@ -14,6 +14,7 @@ parser_a.add_argument('input', type=str, help='input file')
 parser_a.add_argument('--output', type=str, help='output file', default='-')
 annotate.MidAnnotator.customize_parser(parser_a)
 annotate.AmpliconAnnotator.customize_parser(parser_a)
+annotate.DbrAnnotator.customize_parser(parser_a)
 parser_a.set_defaults(func=annotate.annotate)
 
 parser_b = subparsers.add_parser('clip', help='clip help')

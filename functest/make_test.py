@@ -75,7 +75,7 @@ if not exists(READS): make_reads()
 trim_reads()
 run_map()
 
-os.system('amptools annotate --mid mids.txt --trim trim.txt --amps amps.txt --output anno.bam_ raw_map.bam')
+os.system('amptools annotate --mid mids.txt --trim trim.txt --amps amps.txt --dbrs trim.txt --output anno.bam_ raw_map.bam')
 os.system('samtools sort anno.bam_ anno')
 os.system('samtools index anno.bam')
 os.system('amptools clip --output clip.bam --amps amps.txt anno.bam')
