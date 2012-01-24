@@ -88,6 +88,7 @@ class DbrAnnotator(object):
     def report(self):
         pass
 
+
 class AmpliconAnnotator(object):
 
     @classmethod

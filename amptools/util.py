@@ -1,5 +1,7 @@
 from collections import Counter, namedtuple
 
+import vcf
+
 import stats
 
 Obs = namedtuple('Observation', ['rg', 'amp', 'is_ref'])
@@ -75,6 +77,28 @@ def amplicon_distribution(entry, samfile):
             counts[observation] += 1
 
     return counts
+
+
+
+class SeqErrFilter(vcf.Filter):
+
+    name = 'seq_err_filter'
+    short_name = 'selr'
+    description = "Test probability site is a sequencing error using constant rate vs genotypes"
+
+    @classmethod
+    def customize_parser(self, parser):
+        parser.add_argument('--errlr', type=int, default=-10,
+                help='Filter sites above this error log odds ratio')
+
+    def __init__(self, args):
+        self.threshold = args.errlr
+
+    def __call__(self, record):
+       passed, tv, ab = stats.bias_test(record.samples)
+       if tv > self.threshold:
+           return tv
+
 
 
 def apply_filters(record, error_bias=-10, genotype_quality = 30, min_ampc=None):

@@ -80,13 +80,8 @@ function(ra, aa, gt, diag=F) {
 
 def bias_test(calls):
 
-    for c in calls:
-        if c['GT'] != './.':
-            c['_GT'] = map(int, [c['GT'][0], c['GT'][-1]])
-        else:
-            c['_GT'] = None
 
-    calls = [x for x in calls if x['_GT'] is not None]
+    calls = [x for x in calls if x.called]
 
     #TODO: single genotype assumption
     try:
@@ -99,7 +94,7 @@ def bias_test(calls):
         aa = robjects.IntVector([x['AD'][1] for x in calls])
 
 
-    gt = robjects.IntVector(map(sum, [x['_GT'] for x in calls]))
+    gt = robjects.IntVector([x.gt_type for x in calls])
     # print(ra, aa, gt)
     test_val, ab = ll_test(ra, aa, gt)
     # print('test value -ve prefers gt, +ve prefers error', test_val, test_val < 0)

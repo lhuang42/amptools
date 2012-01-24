@@ -9,7 +9,12 @@ setup(
     packages=['amptools'],
     install_requires=[
         'pysam>=0.6',
-    ], 
-    scripts=['amptools/amptools']
+    ],
+    scripts=['amptools/amptools'],
+    entry_points = {
+        'vcf.filters': [
+            'errlr = amptools.util:SeqErrFilter'
+        ]
+    }
 
 )
