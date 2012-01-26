@@ -201,11 +201,19 @@ def annotate(args):
 
 
 def duplicates(args):
-    """ Mark duplicates using a molecular counter """
+    """ Mark duplicates using a molecular counter.
+
+        The file should contain MC tags.  Duplicates are detected by looking
+        for reads in the same start position and orientation and with the same MC tag.
+
+        WARNING: this unsorts your input
+    """
     inp = pysam.Samfile(args.input, "rb" )
     outp = pysam.Samfile(args.output, "wb", template=inp)
 
     # TODO: check sorted
+    # TODO: report duplicates/unannotated stats
+    # TODO: add sort option when output set
 
     current_pos = None
     to_check = {}
