@@ -20,7 +20,8 @@ class AmpliconClipper(object):
 
     def __init__(self, args):
         self.stats = stats.Stats('')
-        self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
+        self.samfile = pysam.Samfile(args.input)
+        self.amplicons = amplicon.load_amplicons_from_header(self.samfile.header, self.stats, self.samfile)
 
     def __call__(self, samfile, outfile):
         clipped = {}

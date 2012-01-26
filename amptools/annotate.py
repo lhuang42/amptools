@@ -145,6 +145,8 @@ class AmpliconAnnotator(object):
         self.stats = stats.Stats('')
         self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
 
+        print 'using',  len(self.amplicons)
+
         AMS = []
         for amp in self.amplicons:
             AMS.append({

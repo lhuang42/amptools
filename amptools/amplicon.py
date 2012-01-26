@@ -9,6 +9,7 @@ from ucsc import Interval
 PILEUP_MAX_DEPTH = 200 * 1500
 
 
+
 def load_amplicons(design, stats, opts, samfile=None):
     amplicons = []
     for row in csv.DictReader(file(design, 'U'), delimiter=opts.delimiter):
@@ -28,6 +29,27 @@ def load_amplicons(design, stats, opts, samfile=None):
             load_pileups=opts.clip, samfile=samfile
         )
         amplicons.append(amplicon)
+
+
+    return amplicons
+
+
+def load_amplicons_from_header(header, stats, samfile, clip=True, load_pileups=True):
+    amplicons = []
+    for row in header['EA']:
+        amp_loc = Interval.from_string(row['AC'])
+        trim_loc = Interval.from_string(row['TC'])
+        strand = int(row.get('ST', 0))
+
+        amplicon = Amplicon(
+            chr=amp_loc.chrom, start=amp_loc.start, end=amp_loc.end, strand=strand,
+            trim_start = trim_loc.start, trim_end=trim_loc.end,
+            external_id = row['ID'], stats = stats,
+            offset_allowed=10,
+            load_pileups=clip, samfile=samfile
+        )
+        amplicons.append(amplicon)
+
     return amplicons
 
 
@@ -56,7 +78,7 @@ class Amplicon(object):
         """ compute the pileups at the trim point for this amplicon """
         self.start_trim_dict = self.pileup_dict_at_position(samfile, self.trim_start)
         self.end_trim_dict = self.pileup_dict_at_position(samfile, self.trim_end)
-        print('trim dict sizes', len(self.start_trim_dict), len(self.end_trim_dict))
+        #print('trim dict sizes', self.external_id, len(self.start_trim_dict), len(self.end_trim_dict))
 
 
     def reads_from(self, samfile):
@@ -92,6 +114,8 @@ class Amplicon(object):
                 continue
 
             for pu in pu_column.pileups:
+                if dict(pu.alignment.tags)['EA'] != self.external_id:
+                    continue
                 pileup_dict[pu.alignment.qname] = pu.qpos
 
         return pileup_dict
@@ -99,7 +123,6 @@ class Amplicon(object):
 
     def clip(self, read):
         """ trim a read """
-
         first_base_pos = self.start_trim_dict.get(read.qname, 0)
         last_base_pos = self.end_trim_dict.get(read.qname, -1)
 

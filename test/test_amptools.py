@@ -2,10 +2,11 @@ import os
 import unittest
 import pysam
 import tempfile
+from collections import Counter
 
 import make_test
 from amptools import annotate
-
+from amptools import clip
 
 def path_to(testfile):
     op = os.path
@@ -116,4 +117,42 @@ class AnnotateTest(unittest.TestCase):
         finally:
             os.unlink(tmp)
             os.unlink(tmpo)
+
+
+class ClipTest(unittest.TestCase):
+
+    def test_clip(self):
+        tmp = tempfile.mktemp()
+        tmpo = tempfile.mktemp()
+
+        print 'using tempfile', tmp
+        try:
+            # create dbr marked file
+            os.system('amptools annotate --output %s --amps %s %s' % (
+                tmp, path_to('amps.txt'), path_to(make_test.RAW_BAM)))
+
+            os.system('samtools sort %s %s.sort' %(tmp, tmp))
+            os.system('samtools index %s.sort.bam' % (tmp))
+
+            args = MockArgs()
+            args.input = tmp + '.sort.bam'
+            args.output = tmpo
+            clip.clip(args)
+
+            n = Counter()
+            for r in pysam.Samfile(tmpo):
+                a = dict(r.tags)['EA']
+                n[a] += 1
+
+                start, end = r.positions[0], r.positions[-1]
+                if a == 'A':
+                    assert start == 120
+                    assert end <= 380
+
+                elif a == 'B':
+                    assert start >= 220
+                    assert end == 480 - 1 #TODO: check off by one
+
+        finally:
+            pass
 
