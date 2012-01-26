@@ -69,11 +69,11 @@ class MidAnnotator(object):
         self.counts[RG] += 1
 
     def report(self):
-        print 'sample reads'
-
-        for k,v in sorted(self.counts.items()):
-            print k, v
-
+        #print 'sample reads'
+        #
+        #for k,v in sorted(self.counts.items()):
+        #    print k, v
+        pass
 
 
 class DbrAnnotator(object):
@@ -154,7 +154,7 @@ def annotate(args):
         annotators.append(AmpliconAnnotator(args, header))
     if args.mids:
         annotators.append(MidAnnotator(args, header))
-    if args.dbrs:
+    if args.counters:
         annotators.append(DbrAnnotator(args, header))
 
     assert 'SQ' in header # http://code.google.com/p/pysam/issues/detail?id=84
@@ -188,7 +188,7 @@ def duplicates(args):
         # hash based on the RG and the DBR
         groups = {}
         for e in entries:
-            rg, dbr = e.opt('RG'), e.opt('DB')
+            rg, dbr = e.opt('RG'), e.opt('MC')
 
             # FIXME: parameterize this DBR validation code
             if len(dbr) != 3 or 'N' in dbr:

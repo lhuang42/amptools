@@ -1,6 +1,7 @@
 import os
 import unittest
 import pysam
+import tempfile
 
 import make_test
 from amptools import annotate
@@ -92,3 +93,27 @@ class AnnotateTest(unittest.TestCase):
         for r in sf:
             anno(r)
             assert 'EA' in dict(r.tags)
+
+    def test_duplicates(self):
+        tmp = tempfile.mktemp()
+        tmpo = tempfile.mktemp()
+
+        print 'using tempfile', tmp
+        try:
+            # create dbr marked file
+            os.system('amptools annotate --output %s --mids %s --mids-read %s --counters %s %s' % (
+                tmp, path_to('mids.txt'), path_to('trim.txt'), path_to('trim.txt'), path_to(make_test.RAW_BAM)))
+
+            args = MockArgs()
+            args.input = tmp
+            args.output = tmpo
+
+            annotate.duplicates(args)
+
+            non_dups = filter(lambda x: not x.is_duplicate, pysam.Samfile(tmpo))
+            assert len(non_dups) == len(make_test.MIDS) * len(make_test.AMPS)
+
+        finally:
+            os.unlink(tmp)
+            os.unlink(tmpo)
+
