@@ -1,3 +1,12 @@
+#!/usr/bin env python
+""" Create test data for suite
+
+Simple script to:
+    * create reference chrom
+    * produce simulated reads
+    * trim those reads to produce MIDs
+    * run mapping to produce a BAM
+"""
 import os
 import random
 import pyfasta
@@ -5,7 +14,7 @@ import commands
 import subprocess
 
 
-REFLEN = 1000
+REFLEN = 10000
 REF = 'reference.fa'
 
 MIDS = {
@@ -30,16 +39,16 @@ def make_reference():
     """ simulate a reference sequence """
     ref = file('reference.fa', 'w')
 
-    ref.write('>chr1\n')
+    for x in range(1,2):
+        ref.write('>chr%s\n' % x)
 
-    for _ in range(REFLEN):
-        ref.write(random.choice('ACGT'))
-    ref.write('\n')
+        for _ in range(REFLEN):
+            ref.write(random.choice('ACGT'))
+        ref.write('\n')
 
 
 
 def make_reads():
-
     ref = pyfasta.Fasta(REF)
     out = file('reads.fa', 'w')
     rn = 0
@@ -67,17 +76,18 @@ def run_map():
     p2 = subprocess.Popen('grep -v SSAHA'.split(), stdin=p1.stdout, stdout=subprocess.PIPE)
     p3 = subprocess.Popen('samtools view -T reference.fa -Sb -o raw_map.bam -'.split(), stdin=p2.stdout)
     p3.wait()
+    os.system('samtools view -H raw_map.bam > h.txt && samtools reheader h.txt raw_map.bam > raw_map.bam_ && mv raw_map.bam_ raw_map.bam')
+    os.system('rm h.txt')
 
+if __name__ == '__main__':
+    make_reference()
+    make_reads()
+    trim_reads()
+    run_map()
 
-exists = os.path.exists
-if not exists(REF): make_reference()
-if not exists(READS): make_reads()
-if not exists('trim.fa'): trim_reads()
-if not exists('raw_map.bam'): run_map()
-
-os.system('amptools annotate --mid mids.txt --trim trim.txt --amps amps.txt --dbrs trim.txt --output anno.bam_ raw_map.bam')
-os.system('samtools sort anno.bam_ anno')
-os.system('samtools index anno.bam')
-os.system('amptools clip --output clip.bam --amps amps.txt anno.bam')
+#os.system('amptools annotate --mid mids.txt --trim trim.txt --amps amps.txt --dbrs trim.txt --output anno.bam_ raw_map.bam')
+#os.system('samtools sort anno.bam_ anno')
+#os.system('samtools index anno.bam')
+#os.system('amptools clip --output clip.bam --amps amps.txt anno.bam')
 
 
