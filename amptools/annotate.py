@@ -10,20 +10,27 @@ import stats
 
 
 class MidAnnotator(object):
-    """ Annotate BAM file with MIDs """
+    """ Annotate BAM file with read groups (RGs) based on molecular barcodes.
+
+        This annotator adds RGs to the header and assigns each read a RG tag with the
+        reag group and a BC tag with the barcode read.
+    """
 
     # TODO: if the BAM is in the same order as the reads, can we avoid preloading read mids
     # TODO: write the barcode quality attribute
 
     @classmethod
     def customize_parser(cls, parser):
-        parser.add_argument('--mids', type=str, help='list of mids')
-        parser.add_argument('--mids-read', type=str, help='file containing the barcode contained in each read')
-        parser.add_argument('--library', type=str, help='library to use in RG header')
-        parser.add_argument('--platform', type=str, help='platform to use in RG header')
+        group = parser.add_argument_group('RG annotation', cls.__doc__)
+        group.add_argument('--mids', type=str, help='file containing whitespace separated BC, RG pairs')
+        group.add_argument('--mids-read', type=str, help='file containing whitespace separated BC, read accession pairs')
+        group.add_argument('--library', type=str, help='(optional) library to use in RG header')
+        group.add_argument('--platform', type=str, help='(optional) platform to use in RG header')
 
 
     def __init__(self, args, header):
+
+        assert args.mids and args.mids_read, 'please provide both --mids and --mids-read'
 
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
@@ -77,16 +84,21 @@ class MidAnnotator(object):
 
 
 class DbrAnnotator(object):
-    """ Annotate BAM file with MIDs """
+    """ Annotate BAM file with molecular counters (MCs).
+
+        This annotator adds a MC tag for each read contaning any molecular
+        counter sequence read.
+    """
 
     # TODO: same as MidAnnotator
 
     @classmethod
     def customize_parser(cls, parser):
-        parser.add_argument('--counters', type=str, help='Molecular counter file for each read')
+        group = parser.add_argument_group('MC annotation', cls.__doc__)
+        group.add_argument('--counters', type=str,
+                help='File containing whitespace separated MC, read accesion')
 
     def __init__(self, args, header):
-
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
             lambda line: line.rstrip().split(),
@@ -104,16 +116,29 @@ class DbrAnnotator(object):
 
 
 class AmpliconAnnotator(object):
+    """ Annotate reads that match expected amplicons (EAs).
 
+        Mark each read that matches and expected amplicon with an EA tag and
+        add a EA section to the header.
+    """
     @classmethod
-    def customize_parser(self, parser):
-        parser.add_argument('--amps', type=str, help='amps file')
-        parser.add_argument('--id-column', type=str, help='amps file', default='id')
-        parser.add_argument('--amplicon-column', type=str, help='amps file', default='amplicon')
-        parser.add_argument('--trim-column', type=str, help='amps file', default='trim')
-        parser.add_argument('--delimiter', type=str, help='file', default='\t')
-        parser.add_argument('--offset-allowed', type=int, help='file', default=10)
-        parser.add_argument('--clip', action='store_true')
+    def customize_parser(cls, parser):
+        group = parser.add_argument_group('EA annotation', cls.__doc__)
+
+        group.add_argument('--amps', type=str,
+                help='Delimited file describing amplicons (required)')
+        group.add_argument('--id-column', type=str,
+                help='ID column (default id)', default='id')
+        group.add_argument('--amplicon-column', type=str,
+                help='Amplicon coordinate column (default amplicon)', default='amplicon')
+        group.add_argument('--trim-column', type=str,
+                help='Amplicon trim coordinates (default trim)', default='trim')
+        group.add_argument('--delimiter', type=str,
+                help='file delimiter (default TAB)', default='\t')
+        group.add_argument('--offset-allowed', type=int,
+                help='Allowed bases between read start and amplicon start (default 10)', default=10)
+        # FIXME: remove argument?
+        group.add_argument('--clip', action='store_true')
 
 
     def __init__(self, args, header):
@@ -146,6 +171,11 @@ class AmpliconAnnotator(object):
 
 
 def annotate(args):
+    """ Annotate reads in a SAM file with tags.
+
+        Use one or more available annotators below to add tags to a SAM file.
+
+    """
     inp = pysam.Samfile(args.input)
 
     header = inp.header
@@ -171,6 +201,7 @@ def annotate(args):
 
 
 def duplicates(args):
+    """ Mark duplicates using a molecular counter """
     inp = pysam.Samfile(args.input, "rb" )
     outp = pysam.Samfile(args.output, "wb", template=inp)
 

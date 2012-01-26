@@ -36,6 +36,7 @@ class AmpliconClipper(object):
 
 
 def clip(args):
+    """ clip primer sequences from amptools annotated BAM """
     inp = pysam.Samfile(args.input, 'rb')
     oup = pysam.Samfile(args.output, 'wb', template=inp)
 

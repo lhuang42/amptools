@@ -1,31 +1,40 @@
-from __future__ import print_function
+"""
+Amptools is a set of tools for dealing with amplicon experiments using the SAM format.
+The subcommands below can be used to annotate a BAM file, find duplicates based on
+molecular counters and clip primer sequences.
+"""
 import argparse
-
+import sys
 import annotate
 import clip
 
 
-parser = argparse.ArgumentParser(prog='amptools')
+parser = argparse.ArgumentParser(prog='amptools', description=sys.modules[__name__].__doc__)
 subparsers = parser.add_subparsers(help='sub-command help')
 
-
-parser_a = subparsers.add_parser('annotate', help='annotate a bam file')
-parser_a.add_argument('input', type=str, help='input file')
-parser_a.add_argument('--output', type=str, help='output file', default='-')
+# annotate command
+parser_a = subparsers.add_parser('annotate', description=annotate.annotate.__doc__,
+        help='annotate a BAM file with tags')
+parser_a.set_defaults(func=annotate.annotate)
+parser_a.add_argument('input', type=str, help='input BAM file')
+parser_a.add_argument('--output', type=str, help='output BAM file (default stdout)', default='-')
 annotate.MidAnnotator.customize_parser(parser_a)
 annotate.AmpliconAnnotator.customize_parser(parser_a)
 annotate.DbrAnnotator.customize_parser(parser_a)
-parser_a.set_defaults(func=annotate.annotate)
 
-
-parser_c = subparsers.add_parser('duplicates', help='annotate a bam file')
-parser_c.add_argument('input', type=str, help='input file')
-parser_c.add_argument('--output', type=str, help='output file', default='-')
+# duplicates command
+parser_c = subparsers.add_parser('duplicates', description=annotate.duplicates.__doc__,
+        help='mark duplicates based on molecular counter')
 parser_c.set_defaults(func=annotate.duplicates)
+parser_c.add_argument('input', type=str, help='input BAM file')
+parser_c.add_argument('--output', type=str, help='output BAM file (default stdout)', default='-')
 
-parser_b = subparsers.add_parser('clip', help='clip help')
+# clip command
+parser_b = subparsers.add_parser('clip', description=clip.clip.__doc__,
+        help='primer clip based on amplicon annotations')
+parser_b.set_defaults(func=clip.clip)
 parser_b.add_argument('input', type=str, help='input file')
 parser_b.add_argument('--output', type=str, help='output file', default='-')
-parser_b.set_defaults(func=clip.clip)
+
 clip.AmpliconClipper.customize_parser(parser_b)
 
