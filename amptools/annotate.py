@@ -39,9 +39,16 @@ class MidAnnotator(object):
 
         # update the header
         RGS = []
+        template = {}
+        if args.platform:
+            template['PL'] = args.platform
+        if args.library:
+            template['LB'] = args.library
         for mid in self.mids.values():
-            # TODO: insert Plaform here
-            RGS.append({'RG': mid, 'SM': mid})
+            entry = {'ID': mid, 'SM': mid}
+            entry.update(template)
+            RGS.append(entry)
+
         header['RG'] = RGS
 
 

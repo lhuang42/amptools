@@ -34,6 +34,8 @@ NREADS = 40
 
 ADAP = "CATG%(mid)sCATG"
 
+RAW_BAM = 'raw_map.bam'
+
 
 def make_reference():
     """ simulate a reference sequence """
