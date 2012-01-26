@@ -12,10 +12,15 @@ import stats
 class MidAnnotator(object):
     """ Annotate BAM file with MIDs """
 
+    # TODO: if the BAM is in the same order as the reads, can we avoid preloading read mids
+    # TODO: write the barcode quality attribute
+
     @classmethod
     def customize_parser(cls, parser):
-        parser.add_argument('--mids', type=str, help='mids file')
-        parser.add_argument('--trim', type=str, help='trim file')
+        parser.add_argument('--mids', type=str, help='list of mids')
+        parser.add_argument('--mids-read', type=str, help='file containing the barcode contained in each read')
+        parser.add_argument('--library', type=str, help='library to use in RG header')
+        parser.add_argument('--platform', type=str, help='platform to use in RG header')
 
 
     def __init__(self, args, header):
@@ -23,7 +28,7 @@ class MidAnnotator(object):
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
             lambda line: line.rstrip().split(),
-            file(args.trim)
+            file(args.mids_read)
         )
 
         self.read_mids = dict(((y,x) for x, y in read_mids))
@@ -74,23 +79,25 @@ class MidAnnotator(object):
 class DbrAnnotator(object):
     """ Annotate BAM file with MIDs """
 
+    # TODO: same as MidAnnotator
+
     @classmethod
     def customize_parser(cls, parser):
-        parser.add_argument('--dbrs', type=str, help='dbr file')
+        parser.add_argument('--counters', type=str, help='Molecular counter file for each read')
 
     def __init__(self, args, header):
 
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
             lambda line: line.rstrip().split(),
-            file(args.dbrs)
+            file(args.counters)
         )
 
         self.read_mids = dict(((y,x) for x, y in read_mids))
 
     def __call__(self, read):
-        DB = self.read_mids[read.qname]
-        read.tags = read.tags + [('DB', DB)]
+        MC = self.read_mids[read.qname]
+        read.tags = read.tags + [('MC', MC)]
 
     def report(self):
         pass
@@ -117,7 +124,8 @@ class AmpliconAnnotator(object):
         for amp in self.amplicons:
             AMS.append({
                 'ID': amp.external_id,
-                'LO': '%s:%s-%s' % (amp.chr, amp.start, amp.end),
+                'AC': '%s:%s-%s' % (amp.chr, amp.start, amp.end),
+                'TC': '%s:%s-%s' % (amp.chr, amp.trim_start, amp.trim_end),
                 'ST': str(amp.strand)
                 })
 
