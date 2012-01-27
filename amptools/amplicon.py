@@ -16,6 +16,7 @@ def load_amplicons(design, stats, opts):
         amp_loc = Interval.from_string(row[opts.amplicon_column])
         trim_loc = Interval.from_string(row[opts.trim_column])
 
+
         if not amp_loc.contains(trim_loc):
             print('trim location not contained in amplicon location, impossible trim', file=sys.stderr)
             sys.exit(1)
@@ -78,6 +79,9 @@ class Amplicon(object):
 
     def matches(self, read):
         """ return True if the read looks like it came from this amplicon"""
+        if read.is_unmapped:
+            return False
+
         start_correct = abs(read.pos - self.start) < self.offset_allowed
         end_correct = abs(read.aend - self.end) < self.offset_allowed
 
