@@ -115,7 +115,7 @@ class Amplicon(object):
             return match[0]
 
         # otherwise, walk the alignment to find the next base
-        index = posn.index(match)
+        index = posns.index(match)
         while match[0] is None:
 
             if lower:
