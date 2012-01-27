@@ -1,4 +1,17 @@
-import sys 
+#!/usr/bin/env python
+import sys
+import cProfile
+import logging 
 import amptools.main
 args = amptools.main.parser.parse_args()
-args.func(args)
+
+level = logging.WARNING    
+if args.verbose == 1: level = logging.INFO 
+if args.verbose >= 2: level = logging.DEBUG
+logging.basicConfig(stream=sys.stderr, level=level)
+
+if not args.profile: 
+    args.func(args)
+else: 
+    cProfile.run('args.func(args)')
+
