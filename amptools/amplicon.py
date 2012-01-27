@@ -103,14 +103,14 @@ class Amplicon(object):
     def _find_position(self, pos, posns, lower=True):
 
         # find the pairing to a given position in the reference
-        matches = [x for x in posns if x[1] == pos]
-        if len(matches) == 0:
+        for x in posns:
+            if x[1] == pos:
+                match = x
+                break
+        else:
             return None
-        elif len(matches) > 1:
-            raise Exception('impossible read alignment')
 
         # if this is aligned to a read base, return that
-        match = matches[0]
         if match[0] is not None:
             return match[0]
 
