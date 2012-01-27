@@ -144,7 +144,7 @@ class ClipTest(unittest.TestCase):
                 a = dict(r.tags)['EA']
                 n[a] += 1
 
-                start, end = r.positions[0], r.positions[-1]
+                start, end = r.positions[0][1], r.positions[-1][1]
                 if a == 'A':
                     assert start == 120
                     assert end <= 380

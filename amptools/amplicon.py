@@ -10,7 +10,7 @@ PILEUP_MAX_DEPTH = 200 * 1500
 
 
 
-def load_amplicons(design, stats, opts, samfile=None):
+def load_amplicons(design, stats, opts):
     amplicons = []
     for row in csv.DictReader(file(design, 'U'), delimiter=opts.delimiter):
         amp_loc = Interval.from_string(row[opts.amplicon_column])
@@ -26,7 +26,6 @@ def load_amplicons(design, stats, opts, samfile=None):
             trim_start = trim_loc.start, trim_end=trim_loc.end,
             external_id = row[opts.id_column], stats = stats,
             offset_allowed=opts.offset_allowed,
-            load_pileups=opts.clip, samfile=samfile
         )
         amplicons.append(amplicon)
 
@@ -46,7 +45,6 @@ def load_amplicons_from_header(header, stats, samfile, clip=True, load_pileups=T
             trim_start = trim_loc.start, trim_end=trim_loc.end,
             external_id = row['ID'], stats = stats,
             offset_allowed=10,
-            load_pileups=clip, samfile=samfile
         )
         amplicons.append(amplicon)
 
@@ -60,7 +58,7 @@ class Amplicon(object):
 
     def __init__(self, external_id=None, chr=None, start=None, end=None,
         strand=None, trim_start=None, trim_end=None, stats=None,
-        offset_allowed=10, load_pileups=False, samfile=None):
+        offset_allowed=10):
         self.external_id = external_id
         self.chr = chr
         self.start = start
@@ -71,16 +69,8 @@ class Amplicon(object):
         self.stats = stats
         self.offset_allowed = offset_allowed
         self.stats.eids.append(self.external_id)
-        if load_pileups:
-            self.load_pileups(samfile)
 
-    def load_pileups(self, samfile):
-        """ compute the pileups at the trim point for this amplicon """
-        self.start_trim_dict = self.pileup_dict_at_position(samfile, self.trim_start)
-        self.end_trim_dict = self.pileup_dict_at_position(samfile, self.trim_end)
-        #print('trim dict sizes', self.external_id, len(self.start_trim_dict), len(self.end_trim_dict))
-
-
+    # TODO: use EA tag here
     def reads_from(self, samfile):
         """ Return an iterator of reads from this amplicon in the samfile """
         reads = samfile.fetch(self.chr, self.start, self.end)
@@ -105,26 +95,47 @@ class Amplicon(object):
 
         return match
 
-    def pileup_dict_at_position(self, samfile, position):
-        """ create a dictionary of read accession to pileup at a position """
-        pileup_dict = {}
 
-        for pu_column in samfile.pileup(self.chr, position, position+1, max_depth=PILEUP_MAX_DEPTH  ):
-            if pu_column.pos != position:
-                continue
+    def _find_position(self, pos, posns, lower=True):
 
-            for pu in pu_column.pileups:
-                if dict(pu.alignment.tags)['EA'] != self.external_id:
-                    continue
-                pileup_dict[pu.alignment.qname] = pu.qpos
+        # find the pairing to a given position in the reference
+        matches = [x for x in posns if x[1] == pos]
+        if len(matches) == 0:
+            return None
+        elif len(matches) > 1:
+            raise Exception('impossible read alignment')
 
-        return pileup_dict
+        # if this is aligned to a read base, return that
+        match = matches[0]
+        if match[0] is not None:
+            return match[0]
+
+        # otherwise, walk the alignment to find the next base
+        index = posn.index(match)
+        while match[0] is None:
+
+            if lower:
+                index += 1
+                if index >= len(posns):
+                    return None
+            else:
+                index -=1
+                if index < 0:
+                    return None
+
+            match = posns[index]
+        return match[0]
+
 
 
     def clip(self, read):
         """ trim a read """
-        first_base_pos = self.start_trim_dict.get(read.qname, 0)
-        last_base_pos = self.end_trim_dict.get(read.qname, -1)
+
+        posns = read.positions
+        first_base_pos = self._find_position(self.trim_start, posns)
+        last_base_pos = self._find_position(self.trim_end, posns)
+
+        print(first_base_pos, last_base_pos)
 
         # cache original details, otherwise they go to None
         seq, qual, cig, end_pos = read.seq, read.qual, read.cigar, read.aend
@@ -141,10 +152,10 @@ class Amplicon(object):
             # recache new stuff and recalculate last base
             seq, qual, cig, end_pos = read.seq, read.qual, read.cigar, read.aend
 
-            if last_base_pos != -1:
+            if last_base_pos is not None:
                 last_base_pos = last_base_pos - first_base_pos
 
-        if last_base_pos != -1:
+        if last_base_pos is not None:
             self.stats.end_trim(self.external_id)
             read.seq = seq[:last_base_pos]
             if qual:
@@ -157,11 +168,3 @@ class Amplicon(object):
         read.tags = (read.tags or []) + [('EA', self.external_id)]
         return read
 
-    def clipped_reads(self, samfile, mark=True):
-        """ return all the reads of this amplicon clipped """
-        reads = self.reads_from(samfile)
-        self.load_pileups(samfile)
-        reads = itertools.imap(self.clip, reads)
-        #if mark:
-        #    reads = itertools.imap(self.mark, reads)
-        return reads

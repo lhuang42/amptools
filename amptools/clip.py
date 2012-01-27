@@ -23,17 +23,15 @@ class AmpliconClipper(object):
         self.samfile = pysam.Samfile(args.input)
         self.amplicons = amplicon.load_amplicons_from_header(self.samfile.header, self.stats, self.samfile)
 
-    def __call__(self, samfile, outfile):
-        clipped = {}
-        for amplicon in self.amplicons:
-            trimmed = amplicon.clipped_reads(samfile)
-            for t in trimmed:
-                outfile.write(t)
-                clipped[t.qname] = True
+        self.amplicons = dict([(x.external_id, x) for x in self.amplicons])
 
-        for r in samfile.fetch():
-            if r.qname not in clipped:
-                outfile.write(r)
+    def __call__(self, samfile, outfile):
+        for r in samfile:
+            EA = dict(r.tags).get('EA', None)
+            if EA is not None:
+                self.amplicons[EA].clip(r)
+            outfile.write(r)
+
 
 
 def clip(args):
