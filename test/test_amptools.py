@@ -95,6 +95,40 @@ class AnnotateTest(unittest.TestCase):
             anno(r)
             assert 'EA' in dict(r.tags)
 
+    def test_AmpliconAnnotator_with_clip(self):
+        sf = raw_bam()
+        header = sf.header
+        args = MockArgs()
+        args.amps = path_to('amps.txt')
+        args.delimiter = '\t'
+        args.id_column = 'id'
+        args.amplicon_column = 'amplicon'
+        args.trim_column = 'trim'
+        args.offset_allowed = 10
+        args.clip = True
+
+        anno = annotate.AmpliconAnnotator(args, header)
+
+        # each read should have an EA
+        for r in sf:
+            anno(r)
+            a = dict(r.tags).get('EA', None)
+
+            assert a is not None
+
+            start, end = r.positions[0][1], r.positions[-1][1]
+            if a == 'A':
+                assert start == 120
+                assert end <= 380
+
+            elif a == 'B':
+                assert start >= 220
+                assert end == 480 - 1 #TODO: check off by one
+
+
+
+
+
     def test_duplicates(self):
         tmp = tempfile.mktemp()
         tmpo = tempfile.mktemp()

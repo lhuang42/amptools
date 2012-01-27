@@ -145,7 +145,7 @@ class AmpliconAnnotator(object):
         self.stats = stats.Stats('')
         self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
 
-        print 'using',  len(self.amplicons)
+        self.clip = args.clip
 
         AMS = []
         for amp in self.amplicons:
@@ -163,8 +163,9 @@ class AmpliconAnnotator(object):
             if amp.matches(read):
                 # FIXME: prevent duplicate annotation
                 # FIXME: amplicon mark method
-                # FIXME: short circuit
                 read.tags = read.tags + [('EA', amp.external_id)]
+                if self.clip:
+                    amp.clip(read)
                 return read
 
 

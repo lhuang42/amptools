@@ -16,7 +16,6 @@ def load_amplicons(design, stats, opts):
         amp_loc = Interval.from_string(row[opts.amplicon_column])
         trim_loc = Interval.from_string(row[opts.trim_column])
 
-
         if not amp_loc.contains(trim_loc):
             print('trim location not contained in amplicon location, impossible trim', file=sys.stderr)
             sys.exit(1)
@@ -29,6 +28,7 @@ def load_amplicons(design, stats, opts):
         )
         amplicons.append(amplicon)
 
+    # TODO: check that amplicons can be uniquely resolved
 
     return amplicons
 
@@ -70,7 +70,7 @@ class Amplicon(object):
         self.offset_allowed = offset_allowed
         self.stats.eids.append(self.external_id)
 
-    # TODO: use EA tag here
+    # TODO: use EA tag here?
     def reads_from(self, samfile):
         """ Return an iterator of reads from this amplicon in the samfile """
         reads = samfile.fetch(self.chr, self.start, self.end)
@@ -127,15 +127,14 @@ class Amplicon(object):
         return match[0]
 
 
-
     def clip(self, read):
-        """ trim a read """
+        """ clip a read to the trim locations of this amplicon """
 
+        # calculate where to clip
         posns = read.positions
         first_base_pos = self._find_position(self.trim_start, posns)
-        last_base_pos = self._find_position(self.trim_end, posns)
+        last_base_pos = self._find_position(self.trim_end, posns, lower=False)
 
-        print(first_base_pos, last_base_pos)
 
         # cache original details, otherwise they go to None
         seq, qual, cig, end_pos = read.seq, read.qual, read.cigar, read.aend
