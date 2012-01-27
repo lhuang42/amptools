@@ -1,7 +1,7 @@
 import sys
 import itertools
 import random
-from collections import Counter
+from collections import Counter, defaultdict
 
 import pysam
 
@@ -184,8 +184,16 @@ class AmpliconAnnotator(object):
 
         header['EA'] = AMS
 
+        # create a list of lists ref by tid
+        self._amps_by_chr = []
+        for _ in range(args.input.nreferences):
+            self._amps_by_chr.append([])
+
+        for a in self.amplicons:
+            self._amps_by_chr[args.input.gettid(a.chr)].append(a)
+
     def __call__(self, read):
-        for amp in self.amplicons:
+        for amp in self._amps_by_chr[read.tid]:
             if amp.matches(read):
                 # FIXME: amplicon mark method
                 read.tags = read.tags + [('EA', amp.external_id)]
@@ -204,7 +212,7 @@ def annotate(args):
         Use one or more available annotators below to add tags to a SAM file.
 
     """
-    inp = pysam.Samfile(args.input)
+    inp = args.input = pysam.Samfile(args.input)
 
     header = inp.header
     annotators = []
