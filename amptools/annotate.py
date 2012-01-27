@@ -30,15 +30,17 @@ class MidAnnotator(object):
 
     def __init__(self, args, header):
 
+        self.counts = Counter()
+
         assert args.mids and args.mids_read, 'please provide both --mids and --mids-read'
 
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
-            lambda line: line.rstrip().split(),
+            lambda line: line.rstrip().split('\t', 1),
             file(args.mids_read)
         )
 
-        self.read_mids = dict(((y,x) for x, y in read_mids))
+        self.read_mids = dict(read_mids)
 
         # get the expected mids
         mids =  itertools.imap(
@@ -46,8 +48,10 @@ class MidAnnotator(object):
             file(args.mids)
         )
 
+
         self.mids = dict(mids)
-        self.counts = dict([(x,0) for x in self.mids.values()])
+        for x in self.mids.values():
+            self.counts[x] = 0
 
         # update the header
         RGS = []
@@ -68,18 +72,22 @@ class MidAnnotator(object):
         return self.mids[read_mid]
 
     def __call__(self, read):
+        try:
+            read_mid = self.read_mids[read.qname]
+            RG = self.match_read(read_mid)
+        except KeyError:
+            self.counts['No match'] += 1
+            #TODO: fallback matching and stats
+            return
 
-        read_mid = self.read_mids[read.qname]
-        RG = self.match_read(read_mid)
-
-        read.tags = read.tags + [('RG', RG), ('BC', read_mid)]
         self.counts[RG] += 1
+        read.tags = read.tags + [('RG', RG), ('BC', read_mid)]
 
     def report(self):
-        #print 'sample reads'
-        #
-        #for k,v in sorted(self.counts.items()):
-        #    print k, v
+        print 'sample reads'
+
+        for k,v in sorted(self.counts.items()):
+           print k, v
         pass
 
 
@@ -99,20 +107,38 @@ class DbrAnnotator(object):
                 help='File containing whitespace separated MC, read accesion')
 
     def __init__(self, args, header):
+        self.counts = Counter()
+        # TODO: factor out reading cutadapt data
         # parse the trim file of actually read mids
         read_mids = itertools.imap(
-            lambda line: line.rstrip().split(),
+            lambda line: line.rstrip().split('\t', 1),
             file(args.counters)
         )
 
-        self.read_mids = dict(((y,x) for x, y in read_mids))
+        try:
+            self.read_mids = dict(read_mids)
+        except Exception, e:
+            raise Exception('could not parse counter file %s: %s' % (args.counters, e))
+
 
     def __call__(self, read):
-        MC = self.read_mids[read.qname]
-        read.tags = read.tags + [('MC', MC)]
+        try:
+            MC = self.read_mids[read.qname]
+            read.tags = read.tags + [('MC', MC)]
+            self.counts[MC] += 1
+        except KeyError:
+            self.counts[None] += 1
+            #print 'missing', read.qname
+            pass
+            # TODO: stats for missing counter
 
     def report(self):
+        print 'counter reads'
+
+        for k,v in sorted(self.counts.items()):
+           print k, v
         pass
+
 
 
 class AmpliconAnnotator(object):
@@ -161,7 +187,6 @@ class AmpliconAnnotator(object):
     def __call__(self, read):
         for amp in self.amplicons:
             if amp.matches(read):
-                # FIXME: prevent duplicate annotation
                 # FIXME: amplicon mark method
                 read.tags = read.tags + [('EA', amp.external_id)]
                 if self.clip:
@@ -183,12 +208,17 @@ def annotate(args):
 
     header = inp.header
     annotators = []
-    if args.amps:
-        annotators.append(AmpliconAnnotator(args, header))
-    if args.mids:
-        annotators.append(MidAnnotator(args, header))
-    if args.counters:
-        annotators.append(DbrAnnotator(args, header))
+
+    try:
+        if args.amps:
+            annotators.append(AmpliconAnnotator(args, header))
+        if args.mids:
+            annotators.append(MidAnnotator(args, header))
+        if args.counters:
+            annotators.append(DbrAnnotator(args, header))
+    except Exception, e:
+        print e
+        sys.exit(1)
 
     assert 'SQ' in header # http://code.google.com/p/pysam/issues/detail?id=84
     oup = pysam.Samfile(args.output, 'wb', header=header)
