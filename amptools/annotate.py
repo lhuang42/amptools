@@ -280,7 +280,10 @@ def duplicates(args):
         # hash based on the RG and the DBR
         groups = {}
         for e in entries:
-            rg, dbr = e.opt('RG'), e.opt('MC')
+            try:
+                rg, dbr = e.opt('RG'), e.opt('MC')
+            except KeyError:
+                log.warning('read %s missing required tags' % e.qname)
 
             # FIXME: parameterize this DBR validation code
             #if len(dbr) != 2 or 'N' in dbr:

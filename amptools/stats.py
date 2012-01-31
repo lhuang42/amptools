@@ -1,9 +1,12 @@
 from __future__ import print_function, division
+import logging; log = logging.getLogger(__name__)
 
 from collections import Counter
 import csv
-from rpy2 import robjects
-from rpy2.robjects.packages import importr
+#from rpy2 import robjects
+#from rpy2.robjects.packages import importr
+
+import pysam
 
 class Stats(object):
 
@@ -46,7 +49,7 @@ class Stats(object):
 
 
 
-ll_test = robjects.r('''
+ll_test = ('''
 function(ra, aa, gt, diag=F) {
     ra_sum = sum(ra)
     aa_sum = sum(aa)
@@ -154,7 +157,7 @@ def cluster_separation(calls):
     return max(values)
 
 
-amp_bias_test = robjects.r('''
+amp_bias_test = ('''
 function(AOs, DPs) {which.max(c(dbinom(AOs, DPs, 0.01),  dbinom(AOs, DPs, 0.5), dbinom(AOs, DPs, 0.99))) - 1}
 ''')
 
@@ -189,4 +192,36 @@ def check_amplicon_bias(calls, counts, amps, amp_counter):
         call['AMPS'] = supporting
         call['AMPC'] = ampcount
 
+
+
+
+def coverage(args):
+    counts = {}
+    inp = pysam.Samfile(args.input)
+
+    uniq = {}
+    reads = {}
+
+    for rg in inp.header['RG']:
+        for amp in inp.header['EA']:
+            key = rg['ID'], amp['ID']
+            reads[key] = uniq[key] = 0
+
+    for r in inp:
+        tags = dict(r.tags)
+        try:
+            key = tags['RG'], tags['EA']
+        except KeyError:
+            continue
+        try:
+            reads[key] += 1
+            if not r.is_duplicate:
+                uniq[key] += 1
+        except KeyError:
+            logging.debug('unexpected key %s' % key)
+
+    print('rg', 'amp', 'unique', 'reads')
+    for (rg, amp) in sorted(reads):
+        key = (rg, amp)
+        print(rg, amp, uniq[key], reads[key])
 

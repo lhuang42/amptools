@@ -7,6 +7,7 @@ import argparse
 import sys
 import annotate
 import clip
+import stats
 
 
 parser = argparse.ArgumentParser(prog='amptools', description=sys.modules[__name__].__doc__)
@@ -39,6 +40,12 @@ parser_b = subparsers.add_parser('clip', description=clip.clip.__doc__,
 parser_b.set_defaults(func=clip.clip)
 parser_b.add_argument('input', type=str, help='input file')
 parser_b.add_argument('--output', type=str, help='output file', default='-')
-
 clip.AmpliconClipper.customize_parser(parser_b)
+
+
+
+
+parser_cov = subparsers.add_parser('coverage')
+parser_cov.set_defaults(func=stats.coverage)
+parser_cov.add_argument('input', type=str, help='input file')
 
