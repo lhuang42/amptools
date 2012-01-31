@@ -202,12 +202,15 @@ def coverage(args):
     uniq = {}
     reads = {}
 
+    total = 0
+
     for rg in inp.header['RG']:
         for amp in inp.header['EA']:
             key = rg['ID'], amp['ID']
             reads[key] = uniq[key] = 0
 
     for r in inp:
+        total += 1
         tags = dict(r.tags)
         try:
             key = tags['RG'], tags['EA']
@@ -219,6 +222,17 @@ def coverage(args):
                 uniq[key] += 1
         except KeyError:
             logging.debug('unexpected key %s' % key)
+
+    total_ot = sum(reads.values())
+    total_uniq = sum(uniq.values())
+
+    total_ot_p = (100.0 * total_ot) / total
+
+    reads_per_counter = float(total_ot) / total_uniq
+
+    print('total %(total)s reads, on target %(total_ot)s, uniq %(total_uniq)s' % locals())
+    print('on target %3.2f%%' % total_ot_p)
+    print('on target reads per counter: %2.2f' % reads_per_counter)
 
     print('rg', 'amp', 'unique', 'reads')
     for (rg, amp) in sorted(reads):
