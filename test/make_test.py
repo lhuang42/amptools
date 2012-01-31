@@ -24,6 +24,8 @@ MIDS = {
     'NA4': 'TTT'
 }
 
+DBRS = ['AA', 'CC', 'GG', 'TT']
+
 AMPS = [
     (100, 400, '+'),
     (200, 500, '-')
@@ -32,7 +34,7 @@ AMPS = [
 READS = 'reads.fa'
 NREADS = 40
 
-ADAP = "CATG%(mid)sCATG"
+ADAP = "CATG%(mid)sCATG%(dbr)sCATG"
 
 RAW_BAM = 'raw_map.bam'
 
@@ -58,7 +60,8 @@ def make_reads():
 
         amp_seq = ref.sequence({'chr': 'chr1', 'start': amp[0], 'stop': amp[1], 'strand': amp[2]})
         for sample, mid in MIDS.items():
-            for _ in range(NREADS):
+            for i in range(NREADS):
+                dbr = DBRS[i%len(DBRS)]
                 read = ADAP % locals()
                 read += amp_seq[:random.randint(len(amp_seq)/2,len(amp_seq))]
                 out.write('>XXX%04d\n' %rn)
@@ -67,7 +70,7 @@ def make_reads():
 
 
 def trim_reads():
-    adap = ADAP % {'mid': 'NNN'}
+    adap = ADAP % {'mid': 'NNN', 'dbr': 'NN'}
     p = subprocess.Popen(
         ['cutadapt', '-g', adap, '--wildcard-file', 'trim.txt', READS], stdout=file('trim.fa', 'w')
     )

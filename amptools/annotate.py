@@ -2,11 +2,37 @@ import sys
 import itertools
 import random
 from collections import Counter, defaultdict
-
+import logging; log = logging.getLogger(__name__)
 import pysam
 
 import amplicon
 import stats
+
+
+def _read_trim_file(trim_file, adaptor=None, char='M'):
+    """ read barcodes or molecular counters from a cutadapt trim file
+        returns a dictionary of (accession, sequence)
+    """
+    # the read part is the everything before the first space
+    # the accession is everything afterwards
+    read_mids = itertools.imap(
+        lambda line: line.rstrip().split(' ',1),
+        file(trim_file)
+    )
+
+    #FIXME: catch variable length adaptors
+    try:
+        # if we have an adaptor, we work out which chars to pull out
+        if adaptor:
+            posns = [i for (i,x) in enumerate(adaptor) if x==char]
+            log.debug('using adaptor positions ' + str(posns))
+            read_mids = dict(((y, ''.join((x[i] for i in posns))) for (x,y) in read_mids))
+        else:
+            read_mids = dict(((y,x) for (x,y) in read_mids))
+    except Exception, e:
+        raise Exception('could not parse file %s: %s' % (trim_file, e))
+
+    return read_mids
 
 
 class MidAnnotator(object):
@@ -35,19 +61,14 @@ class MidAnnotator(object):
         assert args.mids and args.mids_read, 'please provide both --mids and --mids-read'
 
         # parse the trim file of actually read mids
-        read_mids = itertools.imap(
-            lambda line: line.rstrip().split('\t', 1),
-            file(args.mids_read)
-        )
+        self.read_mids = _read_trim_file(args.mids_read, args.adaptor, 'B')
 
-        self.read_mids = dict(read_mids)
+        log.debug(self.read_mids)
 
-        # get the expected mids
         mids =  itertools.imap(
             lambda line: line.rstrip().split(),
             file(args.mids)
         )
-
 
         self.mids = dict(mids)
         for x in self.mids.values():
@@ -108,17 +129,8 @@ class DbrAnnotator(object):
 
     def __init__(self, args, header):
         self.counts = Counter()
-        # TODO: factor out reading cutadapt data
-        # parse the trim file of actually read mids
-        read_mids = itertools.imap(
-            lambda line: line.rstrip().split('\t', 1),
-            file(args.counters)
-        )
+        self.read_mids = _read_trim_file(args.counters, args.adaptor, 'M')
 
-        try:
-            self.read_mids = dict(read_mids)
-        except Exception, e:
-            raise Exception('could not parse counter file %s: %s' % (args.counters, e))
 
 
     def __call__(self, read):
@@ -271,8 +283,8 @@ def duplicates(args):
             rg, dbr = e.opt('RG'), e.opt('MC')
 
             # FIXME: parameterize this DBR validation code
-            if len(dbr) != 3 or 'N' in dbr:
-                continue
+            #if len(dbr) != 2 or 'N' in dbr:
+            #    continue
 
             group = (rg, dbr)
             groups[group] = groups.get(group, []) + [e]

@@ -29,6 +29,8 @@ class AnnotateTest(unittest.TestCase):
         args = MockArgs()
         args.mids = path_to('mids.txt')
         args.mids_read = path_to('trim.txt')
+        args.adaptor = 'CATGBBBCATGMMCATG'
+
         args.platform = 'LS454'
         args.library = 'L1'
 
@@ -47,6 +49,7 @@ class AnnotateTest(unittest.TestCase):
         # each read should have a RG
         for r in sf:
             anno(r)
+            print dict(r.tags)
             assert 'RG' in dict(r.tags)
             assert 'BC' in dict(r.tags)
 
@@ -56,19 +59,22 @@ class AnnotateTest(unittest.TestCase):
         header = sf.header
         args = MockArgs()
         args.counters = path_to('trim.txt')
-
+        args.adaptor = 'CATGBBBCATGMMCATG'
         anno = annotate.DbrAnnotator(args, header)
 
         # each read should have a RG
         for r in sf:
             anno(r)
             assert 'MC' in dict(r.tags)
+            print dict(r.tags)
+            assert dict(r.tags)['MC'] in make_test.DBRS
 
 
     def test_AmpliconAnnotator(self):
         sf = raw_bam()
         header = sf.header
         args = MockArgs()
+        args.input = sf
         args.amps = path_to('amps.txt')
         args.delimiter = '\t'
         args.id_column = 'id'
@@ -106,6 +112,7 @@ class AnnotateTest(unittest.TestCase):
         args.trim_column = 'trim'
         args.offset_allowed = 10
         args.clip = True
+        args.input = sf
 
         anno = annotate.AmpliconAnnotator(args, header)
 
@@ -133,10 +140,10 @@ class AnnotateTest(unittest.TestCase):
         tmp = tempfile.mktemp()
         tmpo = tempfile.mktemp()
 
-        print 'using tempfile', tmp
+        print 'using tempfile', tmp, tmpo
         try:
             # create dbr marked file
-            os.system('amptools annotate --output %s --mids %s --mids-read %s --counters %s %s' % (
+            os.system('amptools annotate --output %s --adaptor CATGBBBCATGMMCATG --mids %s --mids-read %s --counters %s %s' % (
                 tmp, path_to('mids.txt'), path_to('trim.txt'), path_to('trim.txt'), path_to(make_test.RAW_BAM)))
 
             args = MockArgs()
@@ -146,11 +153,13 @@ class AnnotateTest(unittest.TestCase):
             annotate.duplicates(args)
 
             non_dups = filter(lambda x: not x.is_duplicate, pysam.Samfile(tmpo))
-            assert len(non_dups) == len(make_test.MIDS) * len(make_test.AMPS)
+            print len(non_dups)
+            assert len(non_dups) == len(make_test.MIDS) * len(make_test.AMPS) * len(make_test.DBRS)
 
         finally:
-            os.unlink(tmp)
-            os.unlink(tmpo)
+            pass
+            #os.unlink(tmp)
+            #os.unlink(tmpo)
 
 
 class ClipTest(unittest.TestCase):

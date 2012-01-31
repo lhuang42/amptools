@@ -20,6 +20,8 @@ parser_a = subparsers.add_parser('annotate', description=annotate.annotate.__doc
 parser_a.set_defaults(func=annotate.annotate)
 parser_a.add_argument('input', type=str, help='input BAM file')
 parser_a.add_argument('--output', type=str, help='output BAM file (default stdout)', default='-')
+
+parser_a.add_argument('--adaptor', type=str, help='Adaptor in barcode/counter file.  Use B for barcode bases and M for molecular counter bases')
 annotate.MidAnnotator.customize_parser(parser_a)
 annotate.AmpliconAnnotator.customize_parser(parser_a)
 annotate.DbrAnnotator.customize_parser(parser_a)
