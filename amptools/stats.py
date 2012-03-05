@@ -84,7 +84,7 @@ function(ra, aa, gt, diag=F) {
 def bias_test(calls):
 
 
-    calls = [x for x in calls if x.called]
+    calls = [x for x in calls if x.called if x.is_variant]
 
     #TODO: single genotype assumption
     try:
@@ -93,8 +93,8 @@ def bias_test(calls):
         aa = robjects.IntVector([x['AO'][0] for x in calls])
     except KeyError:
         # GATK
-        ra = robjects.IntVector([x['AD'][0] for x in calls])
-        aa = robjects.IntVector([x['AD'][1] for x in calls])
+        ra = robjects.IntVector([x['AD'][0] for x in calls ])
+        aa = robjects.IntVector([x['AD'][1] for x in calls ])
 
 
     gt = robjects.IntVector([x.gt_type for x in calls])

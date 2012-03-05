@@ -95,9 +95,9 @@ class SeqErrFilter(vcf.Filter):
         self.threshold = args.errlr
 
     def __call__(self, record):
-       passed, tv, ab = stats.bias_test(record.samples)
-       if tv > self.threshold:
-           return tv
+        passed, tv, ab = stats.bias_test(record.samples)
+        if tv > self.threshold:
+            return tv
 
 
 
