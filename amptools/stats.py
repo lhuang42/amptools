@@ -3,8 +3,8 @@ import logging; log = logging.getLogger(__name__)
 
 from collections import Counter
 import csv
-#from rpy2 import robjects
-#from rpy2.robjects.packages import importr
+from rpy2 import robjects
+from rpy2.robjects.packages import importr
 
 import pysam
 
@@ -49,7 +49,7 @@ class Stats(object):
 
 
 
-ll_test = ('''
+ll_test = robjects.r('''
 function(ra, aa, gt, diag=F) {
     ra_sum = sum(ra)
     aa_sum = sum(aa)
@@ -221,7 +221,7 @@ def coverage(args):
             if not r.is_duplicate:
                 uniq[key] += 1
         except KeyError:
-            logging.debug('unexpected key %s' % key)
+            logging.debug('unexpected key')
 
     total_ot = sum(reads.values())
     total_uniq = sum(uniq.values())

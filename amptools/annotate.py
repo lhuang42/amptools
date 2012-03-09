@@ -61,7 +61,7 @@ class MidAnnotator(object):
 
         assert args.rgs, 'Need read groups file'
         assert args.bcs_read or args.rgs_read, 'please provide either --rgs-read or --bcs-read'
-        
+
         # parse the trim file of actually read mids
         if args.bcs_read:
             self.read_bcs = _read_trim_file(args.bcs_read, args.adaptor, 'B')
@@ -92,7 +92,7 @@ class MidAnnotator(object):
             RGS.append(entry)
 
         header['RG'] = RGS
-        
+
 
 
     def match_read(self, read_mid):
@@ -146,7 +146,8 @@ class DbrAnnotator(object):
     def __call__(self, read):
         try:
             MC = self.read_mids[read.qname]
-            read.tags = read.tags + [('MC', MC)]
+            if MC != '':
+                read.tags = read.tags + [('MC', MC)]
             self.counts[MC] += 1
         except KeyError:
             self.counts[None] += 1
@@ -297,13 +298,15 @@ def duplicates(args):
             except KeyError:
                 log.warning('read %s missing required tags' % e.qname)
                 continue
+                # FIXME: parameterize this DBR validation code
+                #if len(dbr) != 2 or 'N' in dbr:
+                #    continue
 
-            # FIXME: parameterize this DBR validation code
-            #if len(dbr) != 2 or 'N' in dbr:
-            #    continue
+                group = (rg, dbr)
+                groups[group] = groups.get(group, []) + [e]
+            except KeyError:
+                log.debug('read %s missing required tags' % e.qname)
 
-            group = (rg, dbr)
-            groups[group] = groups.get(group, []) + [e]
 
         # return the best read in each group
         for dups in groups.values():
@@ -324,8 +327,8 @@ def duplicates(args):
 
     n=0
     for (i, entry) in enumerate(inp):
-        if (i % 10000) == 0:
-            print('processed %(i)s reads' % locals())
+        #if (i % 10000) == 0:
+        #    print('processed %(i)s reads' % locals())
 
         #if args.random and random.random() > args.random:
         #    continue
