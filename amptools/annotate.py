@@ -48,8 +48,9 @@ class MidAnnotator(object):
     @classmethod
     def customize_parser(cls, parser):
         group = parser.add_argument_group('RG annotation', cls.__doc__)
-        group.add_argument('--mids', type=str, help='file containing whitespace separated BC, RG pairs')
-        group.add_argument('--mids-read', type=str, help='file containing whitespace separated BC, read accession pairs')
+        group.add_argument('--rgs', type=str, help='file containing whitespace separated BC, RG pairs')
+        group.add_argument('--bcs-read', type=str, help='file containing whitespace separated BC, read accession pairs')
+        group.add_argument('--rgs-read', type=str, help='file containing whitespace separated RG, read accession pairs')
         group.add_argument('--library', type=str, help='(optional) library to use in RG header')
         group.add_argument('--platform', type=str, help='(optional) platform to use in RG header')
 
@@ -58,16 +59,20 @@ class MidAnnotator(object):
 
         self.counts = Counter()
 
-        assert args.mids and args.mids_read, 'please provide both --mids and --mids-read'
-
+        assert args.rgs, 'Need read groups file'
+        assert args.bcs_read or args.rgs_read, 'please provide either --rgs-read or --bcs-read'
+        
         # parse the trim file of actually read mids
-        self.read_mids = _read_trim_file(args.mids_read, args.adaptor, 'B')
-
-        log.debug(self.read_mids)
+        if args.bcs_read:
+            self.read_bcs = _read_trim_file(args.bcs_read, args.adaptor, 'B')
+            self.read_rgs = None
+        else:
+            self.read_rgs = _read_trim_file(args.rgs_read, args.adaptor, 'B')
+            self.read_bcs = None
 
         mids =  itertools.imap(
             lambda line: line.rstrip().split(),
-            file(args.mids)
+            file(args.rgs)
         )
 
         self.mids = dict(mids)
@@ -87,6 +92,7 @@ class MidAnnotator(object):
             RGS.append(entry)
 
         header['RG'] = RGS
+        
 
 
     def match_read(self, read_mid):
@@ -94,15 +100,21 @@ class MidAnnotator(object):
 
     def __call__(self, read):
         try:
-            read_mid = self.read_mids[read.qname]
-            RG = self.match_read(read_mid)
+            if self.read_bcs:
+                read_bc = self.read_bcs[read.qname]
+                RG = self.match_read(read_bc)
+                etags = [('RG', RG), ('BC', read_bc)]
+            else:
+                RG = self.read_rgs[read.qname]
+                etags = [('RG', RG)]
+
         except KeyError:
             self.counts['No match'] += 1
             #TODO: fallback matching and stats
             return
 
         self.counts[RG] += 1
-        read.tags = read.tags + [('RG', RG), ('BC', read_mid)]
+        read.tags = read.tags + etags
 
     def report(self):
         print 'sample reads'
@@ -130,8 +142,6 @@ class DbrAnnotator(object):
     def __init__(self, args, header):
         self.counts = Counter()
         self.read_mids = _read_trim_file(args.counters, args.adaptor, 'M')
-
-
 
     def __call__(self, read):
         try:
@@ -229,10 +239,12 @@ def annotate(args):
     header = inp.header
     annotators = []
 
+    print args.library
+
     try:
         if args.amps:
             annotators.append(AmpliconAnnotator(args, header))
-        if args.mids:
+        if args.rgs:
             annotators.append(MidAnnotator(args, header))
         if args.counters:
             annotators.append(DbrAnnotator(args, header))
@@ -284,6 +296,7 @@ def duplicates(args):
                 rg, dbr = e.opt('RG'), e.opt('MC')
             except KeyError:
                 log.warning('read %s missing required tags' % e.qname)
+                continue
 
             # FIXME: parameterize this DBR validation code
             #if len(dbr) != 2 or 'N' in dbr:
