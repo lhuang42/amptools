@@ -288,16 +288,15 @@ def duplicates(args):
         """ filter a set of start positions for the best read by mapping quality """
         entries = []
         for pos in current:
+            log.debug('using entries from %s, %s' % (group, pos))
             entries.extend(to_check.pop((group[0], group[1], pos)))
 
         # hash based on the RG and the DBR
+        log.debug('filter %s reads' % len(entries))
         groups = {}
         for e in entries:
             try:
                 rg, dbr = e.opt('RG'), e.opt('MC')
-            except KeyError:
-                log.warning('read %s missing required tags' % e.qname)
-                continue
                 # FIXME: parameterize this DBR validation code
                 #if len(dbr) != 2 or 'N' in dbr:
                 #    continue
@@ -327,46 +326,58 @@ def duplicates(args):
 
     n=0
     for (i, entry) in enumerate(inp):
-        #if (i % 10000) == 0:
-        #    print('processed %(i)s reads' % locals())
+        if (i % 10) == 0:
+            log.info('processed %(i)s reads' % locals())
 
+        # TODO: downsample?
         #if args.random and random.random() > args.random:
         #    continue
-        n+=1
+
+        # find out the start and orientation of the read
         is_reverse = entry.is_reverse
         start = entry.pos if not is_reverse else entry.aend
 
+        # append to the to_check index
         position_index = (entry.rname, is_reverse, start)
         to_check[position_index] = to_check.get(position_index, []) + [entry]
 
         if entry.pos != current_pos:
             current_pos = entry.pos
 
-            # could process some of the reads when the reference changes
+            # TODO: could process some of the reads when the reference changes
             # if entry.rname != rname: PASS
 
-            # find positions near enough to be the same read and hand off to filter
     merge_distance = 4
     indexes = sorted(to_check.keys())
+    log.debug(indexes)
     for group, inds in itertools.groupby(indexes, key=lambda x: x[:2]):
-        #log.debug('processing group %(group)s' % locals())
+
+        log.debug('processing group %(group)s' % locals())
         positions = [x[2] for x in inds]
         current = [positions.pop(0)]
-        while positions:
+
+        while True:
             head = current[-1]
-            consider = positions[0]
-            #log.debug('head is %(head)s, considering %(consider)s' % locals())
-            if abs(consider - head) <= merge_distance:
-                current.append(positions.pop(0))
-            else:
-                #log.debug('deduping %(current)s' % locals())
-                for nondup in filter_dups(group, positions):
-                    outp.write(nondup)
+            if len(positions):
+                consider = positions[0]
+                log.debug('head is %(head)s, considering %(consider)s' % locals())
+                if abs(consider - head) <= merge_distance:
+                    current.append(positions.pop(0))
+                    continue
+
+            log.debug('deduping %(current)s' % locals())
+            for nondup in filter_dups(group, positions):
+                outp.write(nondup)
+            if len(positions):
+
                 current = [positions.pop(0)]
+            else:
+                break
 
-        for nondup in filter_dups(group, current):
-            outp.write(nondup)
-
+        #for nondup in filter_dups(group, current):
+        #    log.debug('writing read')
+        #    outp.write(nondup)
+#
 
 
 

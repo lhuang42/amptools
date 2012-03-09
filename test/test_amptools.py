@@ -27,8 +27,8 @@ class AnnotateTest(unittest.TestCase):
         sf = raw_bam()
         header = sf.header
         args = MockArgs()
-        args.mids = path_to('mids.txt')
-        args.mids_read = path_to('trim.txt')
+        args.rgs = path_to('mids.txt')
+        args.bcs_read = path_to('trim.txt')
         args.adaptor = 'CATGBBBCATGMMCATG'
 
         args.platform = 'LS454'
@@ -143,7 +143,7 @@ class AnnotateTest(unittest.TestCase):
         print 'using tempfile', tmp, tmpo
         try:
             # create dbr marked file
-            os.system('amptools annotate --output %s --adaptor CATGBBBCATGMMCATG --mids %s --mids-read %s --counters %s %s' % (
+            os.system('amptools annotate --output %s --adaptor CATGBBBCATGMMCATG --rgs %s --bcs-read %s --counters %s %s' % (
                 tmp, path_to('mids.txt'), path_to('trim.txt'), path_to('trim.txt'), path_to(make_test.RAW_BAM)))
 
             args = MockArgs()
