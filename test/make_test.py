@@ -34,7 +34,7 @@ AMPS = [
 READS = 'reads.fa'
 NREADS = 40
 
-ADAP = "CATG%(mid)sCATG%(dbr)sCATG"
+ADAP = "%(mid)sGATC%(dbr)sCATG"
 
 RAW_BAM = 'raw_map.bam'
 
@@ -70,11 +70,15 @@ def make_reads():
 
 
 def trim_reads():
-    adap = ADAP % {'mid': 'NNN', 'dbr': 'NN'}
     p = subprocess.Popen(
-        ['cutadapt', '-g', adap, '--wildcard-file', 'trim.txt', READS], stdout=file('trim.fa', 'w')
+        ['cutadapt', '-g', 'GATC', '--rest-file', 'trim.txt', READS], stdout=file('trim1.fa', 'w')
     )
     p.wait()
+    p = subprocess.Popen(
+        ['cutadapt', '-g', 'CATG', '--rest-file', 'trim2.txt', 'trim1.fa'], stdout=file('trim.fa', 'w')
+    )
+    p.wait()
+
 
 def run_map():
     p1 = subprocess.Popen('ssaha2 -output sam reference.fa trim.fa'.split(), stdout=subprocess.PIPE)

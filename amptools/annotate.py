@@ -1,15 +1,20 @@
 import sys
 import itertools
-import random
-from collections import Counter, defaultdict
 import logging; log = logging.getLogger(__name__)
 import pysam
+import json
+from collections import Counter
 
 import amplicon
 import stats
 
+TAG_COUNT = 'mc'
+TAG_AMP = 'ea'
+TAG_BC = 'BC'
+TAG_RG = 'RG'
 
-def _read_trim_file(trim_file, adaptor=None, char='M'):
+
+def _read_trim_file(trim_file):
     """ read barcodes or molecular counters from a cutadapt trim file
         returns a dictionary of (accession, sequence)
     """
@@ -20,15 +25,8 @@ def _read_trim_file(trim_file, adaptor=None, char='M'):
         file(trim_file)
     )
 
-    #FIXME: catch variable length adaptors
     try:
-        # if we have an adaptor, we work out which chars to pull out
-        if adaptor:
-            posns = [i for (i,x) in enumerate(adaptor) if x==char]
-            log.debug('using adaptor positions ' + str(posns))
-            read_mids = dict(((y, ''.join((x[i] for i in posns))) for (x,y) in read_mids))
-        else:
-            read_mids = dict(((y,x) for (x,y) in read_mids))
+        read_mids = dict(((y,x) for (x,y) in read_mids))
     except Exception, e:
         raise Exception('could not parse file %s: %s' % (trim_file, e))
 
@@ -64,10 +62,10 @@ class MidAnnotator(object):
 
         # parse the trim file of actually read mids
         if args.bcs_read:
-            self.read_bcs = _read_trim_file(args.bcs_read, args.adaptor, 'B')
+            self.read_bcs = _read_trim_file(args.bcs_read)
             self.read_rgs = None
         else:
-            self.read_rgs = _read_trim_file(args.rgs_read, args.adaptor, 'B')
+            self.read_rgs = _read_trim_file(args.rgs_read)
             self.read_bcs = None
 
         mids =  itertools.imap(
@@ -141,18 +139,16 @@ class DbrAnnotator(object):
 
     def __init__(self, args, header):
         self.counts = Counter()
-        self.read_mids = _read_trim_file(args.counters, args.adaptor, 'M')
+        self.read_mids = _read_trim_file(args.counters)
 
     def __call__(self, read):
         try:
             MC = self.read_mids[read.qname]
             if MC != '':
-                read.tags = read.tags + [('MC', MC)]
+                read.tags = read.tags + [(TAG_COUNT, MC)]
             self.counts[MC] += 1
         except KeyError:
             self.counts[None] += 1
-            #print 'missing', read.qname
-            pass
             # TODO: stats for missing counter
 
     def report(self):
@@ -198,14 +194,15 @@ class AmpliconAnnotator(object):
 
         AMS = []
         for amp in self.amplicons:
-            AMS.append({
-                'ID': amp.external_id,
-                'AC': '%s:%s-%s' % (amp.chr, amp.start, amp.end),
-                'TC': '%s:%s-%s' % (amp.chr, amp.trim_start, amp.trim_end),
-                'ST': str(amp.strand)
-                })
+            AMS.append(json.dumps({
+                'type': 'ea',
+                'id': amp.external_id,
+                'ac': '%s:%s-%s' % (amp.chr, amp.start, amp.end),
+                'tc': '%s:%s-%s' % (amp.chr, amp.trim_start, amp.trim_end),
+                'st': str(amp.strand)
+                }))
 
-        header['EA'] = AMS
+        header['CO'] = header.get('CO', []) + AMS
 
         # create a list of lists ref by tid
         self._amps_by_chr = []
@@ -219,7 +216,7 @@ class AmpliconAnnotator(object):
         for amp in self._amps_by_chr[read.tid]:
             if amp.matches(read):
                 # FIXME: amplicon mark method
-                read.tags = read.tags + [('EA', amp.external_id)]
+                read.tags = read.tags + [(TAG_AMP, amp.external_id)]
                 if self.clip:
                     amp.clip(read)
                 return read
@@ -296,7 +293,7 @@ def duplicates(args):
         groups = {}
         for e in entries:
             try:
-                rg, dbr = e.opt('RG'), e.opt('MC')
+                rg, dbr = e.opt('RG'), e.opt(TAG_COUNT)
                 # FIXME: parameterize this DBR validation code
                 #if len(dbr) != 2 or 'N' in dbr:
                 #    continue

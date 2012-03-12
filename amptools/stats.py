@@ -5,6 +5,7 @@ from collections import Counter
 import csv
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
+import amplicon
 
 import pysam
 
@@ -203,17 +204,19 @@ def coverage(args):
     reads = {}
 
     total = 0
+    stats = Stats('')
+    amplicons = amplicon.load_amplicons_from_header(inp.header, stats, None)
 
     for rg in inp.header['RG']:
-        for amp in inp.header['EA']:
-            key = rg['ID'], amp['ID']
+        for amp in amplicons:
+            key = rg['ID'], amp.external_id
             reads[key] = uniq[key] = 0
 
     for r in inp:
         total += 1
         tags = dict(r.tags)
         try:
-            key = tags['RG'], tags['EA']
+            key = tags['RG'], tags['ea']
         except KeyError:
             continue
         try:

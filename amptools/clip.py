@@ -27,7 +27,7 @@ class AmpliconClipper(object):
 
     def __call__(self, samfile, outfile):
         for r in samfile:
-            EA = dict(r.tags).get('EA', None)
+            EA = dict(r.tags).get('ea', None)
             if EA is not None:
                 self.amplicons[EA].clip(r)
             outfile.write(r)

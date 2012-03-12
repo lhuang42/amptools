@@ -3,6 +3,7 @@ import sys
 import itertools
 import csv
 import cigar
+import json
 from ucsc import Interval
 
 # set the pileup engine to allow 1500 samples at depth of 200
@@ -36,15 +37,22 @@ def load_amplicons(design, stats, opts):
 
 def load_amplicons_from_header(header, stats, samfile, clip=True, load_pileups=True):
     amplicons = []
-    for row in header['EA']:
-        amp_loc = Interval.from_string(row['AC'])
-        trim_loc = Interval.from_string(row['TC'])
-        strand = int(row.get('ST', 0))
+    for row in header['CO']:
+        try:
+            row = json.loads(row)
+        except:
+            continue
+        if row.get('type', None) != 'ea':
+            continue
+
+        amp_loc = Interval.from_string(row['ac'])
+        trim_loc = Interval.from_string(row['tc'])
+        strand = int(row.get('st', 0))
 
         amplicon = Amplicon(
             chr=amp_loc.chrom, start=amp_loc.start, end=amp_loc.end, strand=strand,
             trim_start = trim_loc.start, trim_end=trim_loc.end,
-            external_id = row['ID'], stats = stats,
+            external_id = row['id'], stats = stats,
             offset_allowed=10,
         )
         amplicons.append(amplicon)
