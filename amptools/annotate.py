@@ -26,7 +26,7 @@ def _read_trim_file(trim_file):
     )
 
     try:
-        read_mids = dict(((y,x) for (x,y) in read_mids))
+        read_mids = dict(((x,y) for (x,y) in read_mids))
     except Exception, e:
         raise Exception('could not parse file %s: %s' % (trim_file, e))
 
@@ -69,14 +69,13 @@ class MidAnnotator(object):
             self.read_bcs = None
 
         mids =  itertools.imap(
-            lambda line: line.rstrip().split(),
+            lambda line: line.rstrip().split('\t', 1),
             file(args.rgs)
         )
 
         self.mids = dict(mids)
         for x in self.mids.values():
             self.counts[x] = 0
-
         # update the header
         RGS = []
         template = {}
@@ -248,6 +247,7 @@ def annotate(args):
             annotators.append(DbrAnnotator(args, header))
     except Exception, e:
         print e
+        raise
         sys.exit(1)
 
     assert 'SQ' in header # http://code.google.com/p/pysam/issues/detail?id=84

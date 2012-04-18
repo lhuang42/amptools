@@ -45,4 +45,5 @@ clip.AmpliconClipper.customize_parser(parser_b)
 parser_cov = subparsers.add_parser('coverage', help='coverage')
 parser_cov.set_defaults(func=stats.coverage)
 parser_cov.add_argument('input', type=str, help='input file')
+parser_cov.add_argument('--control', type=str, help='control RG')
 

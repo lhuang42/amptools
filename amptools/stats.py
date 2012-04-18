@@ -3,6 +3,7 @@ import logging; log = logging.getLogger(__name__)
 
 from collections import Counter
 import csv
+import sys
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
 import amplicon
@@ -233,12 +234,19 @@ def coverage(args):
 
     reads_per_counter = float(total_ot) / total_uniq
 
-    print('total %(total)s reads, on target %(total_ot)s, uniq %(total_uniq)s' % locals())
-    print('on target %3.2f%%' % total_ot_p)
-    print('on target reads per counter: %2.2f' % reads_per_counter)
+    print('total %(total)s reads, on target %(total_ot)s, uniq %(total_uniq)s' % locals(), file=sys.stderr)
+    print('on target %3.2f%%' % total_ot_p, file=sys.stderr)
+    print('on target reads per counter: %2.2f' % reads_per_counter, file=sys.stderr)
 
-    print('rg', 'amp', 'unique', 'reads')
+    if args.control:
+        total_control = sum([reads[x] for x in reads if x[0] == args.control])
+        control_p = (100*total_control)/total
+        print('control reads %(total_control)s, %(control_p)f%%' % locals(), file=sys.stderr)
+
+    out = csv.writer(sys.stdout)
+    out.writerow(['rg', 'amp', 'unique', 'reads'])
     for (rg, amp) in sorted(reads):
-        key = (rg, amp)
-        print(rg, amp, uniq[key], reads[key])
+        if rg != args.control:
+            key = (rg, amp)
+            out.writerow(map(str, (rg, amp, uniq[key], reads[key])))
 
