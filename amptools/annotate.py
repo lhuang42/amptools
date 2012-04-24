@@ -244,8 +244,6 @@ def annotate(args):
     header = inp.header
     annotators = []
 
-    print args.library
-
     try:
         if args.amps:
             annotators.append(AmpliconAnnotator(args, header))
