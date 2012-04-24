@@ -51,6 +51,7 @@ class MidAnnotator(object):
         group.add_argument('--rgs-read', type=str, help='file containing whitespace separated RG, read accession pairs')
         group.add_argument('--library', type=str, help='(optional) library to use in RG header')
         group.add_argument('--platform', type=str, help='(optional) platform to use in RG header')
+        group.add_argument('--exclude-rg', type=str, help='(optional) platform to use in RG header')
 
 
     def __init__(self, args, header):
@@ -59,6 +60,8 @@ class MidAnnotator(object):
 
         assert args.rgs, 'Need read groups file'
         assert args.bcs_read or args.rgs_read, 'please provide either --rgs-read or --bcs-read'
+
+        self.exclude = args.exclude_rg
 
         # parse the trim file of actually read mids
         if args.bcs_read:
@@ -84,9 +87,10 @@ class MidAnnotator(object):
         if args.library:
             template['LB'] = args.library
         for mid in self.mids.values():
-            entry = {'ID': mid, 'SM': mid}
-            entry.update(template)
-            RGS.append(entry)
+            if not mid == self.exclude:
+                entry = {'ID': mid, 'SM': mid}
+                entry.update(template)
+                RGS.append(entry)
 
         header['RG'] = RGS
 
@@ -112,6 +116,9 @@ class MidAnnotator(object):
 
         self.counts[RG] += 1
         read.tags = read.tags + etags
+        if RG == self.exclude:
+            return False
+        return read
 
     def report(self):
         print 'sample reads'
@@ -146,6 +153,7 @@ class DbrAnnotator(object):
             if MC != '':
                 read.tags = read.tags + [(TAG_COUNT, MC)]
             self.counts[MC] += 1
+            return read
         except KeyError:
             self.counts[None] += 1
             # TODO: stats for missing counter
@@ -218,7 +226,7 @@ class AmpliconAnnotator(object):
                 read.tags = read.tags + [(TAG_AMP, amp.external_id)]
                 if self.clip:
                     amp.clip(read)
-                return read
+        return read
 
 
     def report(self):
@@ -254,9 +262,14 @@ def annotate(args):
     oup = pysam.Samfile(args.output, 'wb', header=header)
 
     for read in inp:
+        include = True
         for annotator in annotators:
-            annotator(read)
-        oup.write(read)
+            # Annotators return False to exclude
+            if annotator(read) is False:
+                include = False
+                break
+        if include:
+            oup.write(read)
 
 
     for a in annotators:
