@@ -189,6 +189,8 @@ class AmpliconAnnotator(object):
                 help='file delimiter (default TAB)', default='\t')
         group.add_argument('--offset-allowed', type=int,
                 help='Allowed bases between read start and amplicon start (default 10)', default=10)
+        group.add_argument('--exclude-offtarget', action='store_true', default=False,
+                help='Exclude reads not matching target amplicons')
         # FIXME: remove argument?
         group.add_argument('--clip', action='store_true')
 
@@ -196,8 +198,8 @@ class AmpliconAnnotator(object):
     def __init__(self, args, header):
         self.stats = stats.Stats('')
         self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
-
         self.clip = args.clip
+        self.exclude_offtarget = args.exclude_offtarget
 
         AMS = []
         for amp in self.amplicons:
@@ -226,6 +228,9 @@ class AmpliconAnnotator(object):
                 read.tags = read.tags + [(TAG_AMP, amp.external_id)]
                 if self.clip:
                     amp.clip(read)
+                return read
+        if self.exclude_offtarget:
+            return False
         return read
 
 
