@@ -207,11 +207,13 @@ def coverage(args):
     total = 0
     stats = Stats('')
     amplicons = amplicon.load_amplicons_from_header(inp.header, stats, None)
+    libs = {}
 
     for rg in inp.header['RG']:
         for amp in amplicons:
             key = rg['ID'], amp.external_id
             reads[key] = uniq[key] = 0
+            libs[rg['ID']] = rg['LB']
 
     for r in inp:
         total += 1
@@ -244,9 +246,9 @@ def coverage(args):
         print('control reads %(total_control)s, %(control_p)f%%' % locals(), file=sys.stderr)
 
     out = csv.writer(sys.stdout)
-    out.writerow(['rg', 'amp', 'unique', 'reads'])
+    out.writerow(['rg', 'lib', 'amp', 'unique', 'reads'])
     for (rg, amp) in sorted(reads):
         if rg != args.control:
             key = (rg, amp)
-            out.writerow(map(str, (rg, amp, uniq[key], reads[key])))
+            out.writerow(map(str, (rg, libs[rg], amp, uniq[key], reads[key])))
 
