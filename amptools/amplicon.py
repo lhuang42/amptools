@@ -159,6 +159,9 @@ class Amplicon(object):
         # cache original details, otherwise they go to None
         seq, qual, cig, end_pos = read.seq, read.qual, read.cigar, read.aend
 
+        # pileup position ignores soft clips, so remove
+        cig, seq, qual = cigar.remove_soft(cig, seq, qual)
+
         if first_base_pos:
             self.stats.start_trim(self.external_id)
             read.seq = seq[first_base_pos:]
@@ -180,15 +183,6 @@ class Amplicon(object):
             if qual:
                 read.qual = qual[:last_base_pos]
             read.cigar = cigar.trim_cigar(cig, len(read.seq))
-
-
-        if read.seq is None or read.qual is None:
-            print('read is None', read)
-            print(read.seq, read.qual, first_base_pos, last_base_pos)
-        if len(read.seq) != len(read.qual):
-            print(read)
-            print(len(read.seq), len(read.qual))
-            raise Exception('game over dude')
 
         return read
 
