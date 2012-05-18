@@ -213,7 +213,7 @@ def coverage(args):
         for amp in amplicons:
             key = rg['ID'], amp.external_id
             reads[key] = uniq[key] = 0
-            libs[rg['ID']] = rg['LB']
+            libs[rg['ID']] = rg.get('LB', None)
 
     for r in inp:
         total += 1

@@ -47,7 +47,8 @@ def load_amplicons_from_header(header, stats, samfile, clip=True, load_pileups=T
 
         amp_loc = Interval.from_string(row['ac'])
         trim_loc = Interval.from_string(row['tc'])
-        strand = int(row.get('st', 0))
+        strand = row.get('st')
+        strand = int(strand) if strand != 'None' else 0
 
         amplicon = Amplicon(
             chr=amp_loc.chrom, start=amp_loc.start, end=amp_loc.end, strand=strand,
@@ -147,6 +148,10 @@ class Amplicon(object):
         first_base_pos = self._find_position(self.trim_start, posns)
         last_base_pos = self._find_position(self.trim_end, posns, lower=False)
 
+        # exlude primer only reads
+        # TODO: may be better to check the read start end for this
+        if not (first_base_pos or last_base_pos):
+            return None
 
         # cache original details, otherwise they go to None
         seq, qual, cig, end_pos = read.seq, read.qual, read.cigar, read.aend
@@ -172,6 +177,15 @@ class Amplicon(object):
             if qual:
                 read.qual = qual[:last_base_pos]
             read.cigar = cigar.trim_cigar(cig, len(read.seq))
+
+
+        if read.seq is None or read.qual is None:
+            print('read is None', read)
+            print(read.seq, read.qual, first_base_pos, last_base_pos)
+        if len(read.seq) != len(read.qual):
+            print(read)
+            print(len(read.seq), len(read.qual))
+            raise Exception('game over dude')
 
         return read
 

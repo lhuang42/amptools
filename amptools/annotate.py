@@ -20,13 +20,14 @@ def _read_trim_file(trim_file):
     """
     # the read part is the everything before the first space
     # the accession is everything afterwards
+    log.info('reading file {0}'.format(trim_file))
     read_mids = itertools.imap(
         lambda line: line.rstrip().split(' ',1),
         file(trim_file)
     )
 
     try:
-        read_mids = dict(((x,y) for (x,y) in read_mids))
+        read_mids = dict(((y, x) for (x,y) in read_mids))
     except Exception, e:
         raise Exception('could not parse file %s: %s' % (trim_file, e))
 
@@ -46,19 +47,20 @@ class MidAnnotator(object):
     @classmethod
     def customize_parser(cls, parser):
         group = parser.add_argument_group('RG annotation', cls.__doc__)
-        group.add_argument('--rgs', type=str, help='file containing whitespace separated BC, RG pairs')
+        group.add_argument('--rgs', type=str, help='file containing whitespace separated BC, RG pairs (enables annotator)')
         group.add_argument('--bcs-read', type=str, help='file containing whitespace separated BC, read accession pairs')
         group.add_argument('--rgs-read', type=str, help='file containing whitespace separated RG, read accession pairs')
         group.add_argument('--library', type=str, help='(optional) library to use in RG header')
         group.add_argument('--platform', type=str, help='(optional) platform to use in RG header')
         group.add_argument('--exclude-rg', type=str, help='(optional) platform to use in RG header')
+        group.add_argument('--offbyone', action='store_true', help='Allow off by one errors in the MID')
 
 
     def __init__(self, args, header):
 
         self.counts = Counter()
 
-        assert args.rgs, 'Need read groups file'
+        assert args.rgs, 'Need --rgs'
         assert args.bcs_read or args.rgs_read, 'please provide either --rgs-read or --bcs-read'
 
         self.exclude = args.exclude_rg
@@ -77,6 +79,7 @@ class MidAnnotator(object):
         )
 
         self.mids = dict(mids)
+        log.info('read {0} mids'.format(len(self.mids)))
         for x in self.mids.values():
             self.counts[x] = 0
         # update the header
@@ -94,6 +97,15 @@ class MidAnnotator(object):
 
         header['RG'] = RGS
 
+        # precompute off by one errors:
+        if args.offbyone:
+            for bc, mid in self.mids.items():
+                for (i, base) in enumerate(bc):
+                    for sub in 'ACGT':
+                        if sub != base:
+                            alt = bc[:i] + sub + bc[i+1:]
+                            if alt not in self.mids:
+                                self.mids[alt] = bc
 
 
     def match_read(self, read_mid):
@@ -103,6 +115,7 @@ class MidAnnotator(object):
         try:
             if self.read_bcs:
                 read_bc = self.read_bcs[read.qname]
+                log.info('rbc ' + read_bc + ' ' + ','.join(self.mids.keys()))
                 RG = self.match_read(read_bc)
                 etags = [('RG', RG), ('BC', read_bc)]
             else:
@@ -227,8 +240,13 @@ class AmpliconAnnotator(object):
                 # FIXME: amplicon mark method
                 read.tags = read.tags + [(TAG_AMP, amp.external_id)]
                 if self.clip:
-                    amp.clip(read)
-                return read
+                    clipped = amp.clip(read)
+                    if clipped:
+                        return clipped
+                    else:
+                        return False
+                else:
+                    return read
         if self.exclude_offtarget:
             return False
         return read
@@ -252,7 +270,7 @@ def annotate(args):
     try:
         if args.amps:
             annotators.append(AmpliconAnnotator(args, header))
-        if args.rgs:
+        if args.rgs or args.rgs_read:
             annotators.append(MidAnnotator(args, header))
         if args.counters:
             annotators.append(DbrAnnotator(args, header))
@@ -264,6 +282,7 @@ def annotate(args):
     assert 'SQ' in header # http://code.google.com/p/pysam/issues/detail?id=84
     oup = pysam.Samfile(args.output, 'wb', header=header)
 
+    log.info('begin read annotation')
     for read in inp:
         include = True
         for annotator in annotators:
