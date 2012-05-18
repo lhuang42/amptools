@@ -5,7 +5,7 @@ import csv
 import cigar
 import json
 from ucsc import Interval
-
+import logging; log = logging.getLogger(__name__)
 # set the pileup engine to allow 1500 samples at depth of 200
 PILEUP_MAX_DEPTH = 200 * 1500
 
@@ -94,14 +94,17 @@ class Amplicon(object):
         start_correct = abs(read.pos - self.start) < self.offset_allowed
         end_correct = abs(read.aend - self.end) < self.offset_allowed
 
-        if self.strand > 0:
+        if self.strand and self.strand > 0:
             orientation_correct = not read.is_reverse
             match =  start_correct and orientation_correct
-        elif self.strand < 0:
+        elif self.strand and self.strand < 0:
             orientation_correct = read.is_reverse
             match = end_correct and orientation_correct
         else:
-            match = start_correct or end_correct
+            if read.is_reverse:
+                match = end_correct
+            else:
+                match = start_correct
 
         if match:
             self.stats.match(self.external_id)
