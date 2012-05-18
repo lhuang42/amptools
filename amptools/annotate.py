@@ -105,7 +105,7 @@ class MidAnnotator(object):
                         if sub != base:
                             alt = bc[:i] + sub + bc[i+1:]
                             if alt not in self.mids:
-                                self.mids[alt] = bc
+                                self.mids[alt] = mid
 
 
     def match_read(self, read_mid):
