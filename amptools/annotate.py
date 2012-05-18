@@ -125,7 +125,7 @@ class MidAnnotator(object):
         except KeyError:
             self.counts['No match'] += 1
             #TODO: fallback matching and stats
-            return
+            return False
 
         self.counts[RG] += 1
         read.tags = read.tags + etags
