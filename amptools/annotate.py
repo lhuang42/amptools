@@ -115,7 +115,6 @@ class MidAnnotator(object):
         try:
             if self.read_bcs:
                 read_bc = self.read_bcs[read.qname]
-                log.info('rbc ' + read_bc + ' ' + ','.join(self.mids.keys()))
                 RG = self.match_read(read_bc)
                 etags = [('RG', RG), ('BC', read_bc)]
             else:

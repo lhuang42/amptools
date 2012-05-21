@@ -48,7 +48,7 @@ def remove_soft(cigar, seq, qual):
     if cigar[-1][OP] == SOFT_CLIP:
         sc = cigar.pop()
         seq = seq[:-sc[BASES]]
-        qual = seq[:-sc[BASES]]
+        qual = qual[:-sc[BASES]]
 
     return cigar, seq, qual
 
