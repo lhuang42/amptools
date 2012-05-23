@@ -89,7 +89,7 @@ class MidAnnotator(object):
             template['PL'] = args.platform
         if args.library:
             template['LB'] = args.library
-        for mid in self.mids.values():
+        for mid in sorted(self.mids.values()):
             if not mid == self.exclude:
                 entry = {'ID': mid, 'SM': mid}
                 entry.update(template)
