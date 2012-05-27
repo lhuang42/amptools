@@ -13,7 +13,8 @@ setup(
     scripts=['amptools/amptools'],
     entry_points = {
         'vcf.filters': [
-            'errlr = amptools.util:SeqErrFilter'
+            'errlr = amptools.util:SeqErrFilter',
+            'ampcount = amptools.util:AmpliconFilter'
         ]
     }
 

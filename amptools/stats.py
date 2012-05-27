@@ -56,8 +56,7 @@ function(ra, aa, gt, diag=F) {
     ra_sum = sum(ra)
     aa_sum = sum(aa)
     ab = aa_sum / (ra_sum + aa_sum)
-    gtp = 0.01 + (0.98*gt/2)
-
+    gtp = 0.5 + (0.48*(gt-1))
 
     error_likelihood = log(dbinom(aa, ra+aa, ab))
     gt_likelihood = log(dbinom(aa, ra+aa, gtp))
@@ -86,7 +85,7 @@ function(ra, aa, gt, diag=F) {
 def bias_test(calls):
 
 
-    calls = [x for x in calls if x.called if x.is_variant]
+    calls = [x for x in calls if x.called]
 
     #TODO: single genotype assumption
     try:
@@ -102,10 +101,7 @@ def bias_test(calls):
     gt = robjects.IntVector([x.gt_type for x in calls])
     # print(ra, aa, gt)
     test_val, ab = ll_test(ra, aa, gt)
-    # print('test value -ve prefers gt, +ve prefers error', test_val, test_val < 0)
-
-    if ab < 0.05:
-        return True, test_val, ab
+    #print('test value -ve prefers gt, +ve prefers error', test_val, test_val < 0, ab)
 
     return test_val < 0, test_val, ab
 

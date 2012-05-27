@@ -1,6 +1,9 @@
 from collections import Counter, namedtuple
 
 import vcf
+import vcf.filters
+
+import pysam
 
 import stats
 
@@ -8,14 +11,52 @@ Obs = namedtuple('Observation', ['rg', 'amp', 'is_ref'])
 
 PILEUP_DEPTH = 300000
 
-def amplicon_distribution(entry, samfile):
-    """ Compute the distribution of a VCF entry over different amplicons
+class AmpliconFilter(vcf.filters.Base):
 
-        Given a vcf entry and a samfile, this method looks at each read and
-        decides whether it consitutes a reference of alternate allele.
-        It returns a Counter containing (rg, amplicon, is_ref)
-    """
+    name = 'ac'
+    description = "Test for at least two amplicons for a novel SNP"
 
+    @classmethod
+    def customize_parser(self, parser):
+        parser.add_argument('--reads', type=str,
+                help='Samfile')
+
+    def __init__(self, args):
+        self.reads = pysam.Samfile(args.reads)
+        self.threshold = 10
+
+    def __call__(self, entry):
+        if entry.is_monomorphic or entry.ID:
+            return None
+        if entry.is_indel:
+            raise NotImplementedError()
+
+        counts = {}
+        ab = {}
+        posn = entry.POS - 1
+        for puc in self.reads.pileup(entry.CHROM, posn-1, posn+1, max_depth=PILEUP_DEPTH):
+            if puc.pos != posn:
+                continue
+
+            for pu in puc.pileups:
+                if pu.is_del:
+                    continue
+                base = pu.alignment.query[pu.qpos]
+                ea = dict(pu.alignment.tags).get('ea', None)
+                ab[base] = ab.get(base, 0) + 1
+                if ea and base == entry.ALT[0]:
+                    counts[ea] = counts.get(ea, 0) + 1
+        amps = 0
+        for amp, count in counts.items():
+            if count > self.threshold:
+                amps += 1
+        if amps < 2:
+            return True
+
+
+
+
+def _dep(entry, samfile):
     # TODO: single alternate allele assumption
     if len(entry.REF) != len(entry.ALT[0]):
         is_indel = True
@@ -80,11 +121,10 @@ def amplicon_distribution(entry, samfile):
 
 
 
-class SeqErrFilter(vcf.Filter):
+class SeqErrFilter(vcf.filters.Base):
 
-    name = 'seq_err_filter'
-    short_name = 'selr'
-    description = "Test probability site is a sequencing error using constant rate vs genotypes"
+    name = 'eb'
+    description = "Test for error bias"
 
     @classmethod
     def customize_parser(self, parser):
@@ -95,76 +135,11 @@ class SeqErrFilter(vcf.Filter):
         self.threshold = args.errlr
 
     def __call__(self, record):
+        if record.is_monomorphic:
+            return None
         passed, tv, ab = stats.bias_test(record.samples)
         if tv > self.threshold:
             return tv
-
-
-
-def apply_filters(record, error_bias=-10, genotype_quality = 30, min_ampc=None):
-
-    # cannot handle composite classes
-    if len(record.ALT) > 1:
-        record.add_filter('composite')
-        return
-
-    # biased site filter: tests for all sites coming from an error probability
-    if error_bias:
-        passed, tv, ab = stats.bias_test(record.samples)
-        record.add_info('ERRLR', tv)#'=%(tv).2f;ERRAB=%(ab).2f' % locals())
-        if tv >= error_bias:
-            record.add_filter('ERRLR=%(tv).2f' % locals())
-            # return
-
-    if min_ampc:
-        # check for a variant that is only supported by a single amplicon
-        # we do not allow novel variants only seen by one amplicon
-        ampcs = [int(x['AMPC']) for x in record.samples if x['_GT'] is not None and sum(x['_GT']) != 0]
-        if all([x<2 for x in ampcs]):
-            if record.ID == '.':
-                record.add_filter('AMPC=%s' % min(ampcs))
-
-        # check for amplicon support for each call
-        # for problem calls, set the GQ to 0
-        for call in record.samples:
-            if call['_GT'] is None or call['_GT'] == 0:
-                continue
-
-            if call['AMPS'] <  call['AMPC']:
-                call['GQ'] = 0
-
-        # if the
-        # ampss = [int(x['AMPS']) for x in record.samples if x['_GT'] is not None and sum(x['_GT']) != 0]
-        # if not any([x>=min_ampc for x in ampss]):
-        #     record.add_filter('AMPS=%s' % max(ampss))
-
-
-
-    if genotype_quality:
-        quals = [x['GQ'] for x in record.samples if x['_GT'] is not None and sum(x['_GT']) != 0]
-        if not any([x>=genotype_quality for x in quals]):
-            record.add_filter('max_GQ=%s' % max(quals))
-            # return
-
-
-    #
-    # if homopolymer_indel:
-    #     is_ins, is_del = is_homo_ins(fields), is_homo_del(fields)
-    #     line = add_info(line, 'HOMOINDEL=%s' % ("T" if is_ins or is_del else 'F'))
-    #
-    #     if 'REPEAT' in fields.INFO:
-    #         repeats = parse_repeats(fields.INFO['REPEAT'])
-    #
-    #         if is_del:
-    #             ref = fields.REF
-    #             if ref == ref[0] * len(ref):
-    #                 ref = ref[0]
-    #             ref_count = repeats.get(ref, 0)
-    #         else:
-    #             ref_count = repeats.get(fields.REF, 0)
-    #         # print is_ins, is_del, ref_count
-    #         if (is_ins or is_del) and ref_count > max_indel_repeat:
-    #             line = add_info(line, 'REPEAT=%s' % ref_count)
 
 
 
