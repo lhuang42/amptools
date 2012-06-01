@@ -1,9 +1,12 @@
 import sys
 import itertools
 import logging; log = logging.getLogger(__name__)
-import pysam
+
 import json
 from collections import Counter
+
+import pysam
+import ngram
 
 import amplicon
 import stats
@@ -54,6 +57,7 @@ class MidAnnotator(object):
         group.add_argument('--platform', type=str, help='(optional) platform to use in RG header')
         group.add_argument('--exclude-rg', type=str, help='(optional) platform to use in RG header')
         group.add_argument('--offbyone', action='store_true', help='Allow off by one errors in the MID')
+        group.add_argument('--ngram', action='store_true', help='Match MIDs using ngrams')
 
 
     def __init__(self, args, header):
@@ -106,10 +110,22 @@ class MidAnnotator(object):
                             alt = bc[:i] + sub + bc[i+1:]
                             if alt not in self.mids:
                                 self.mids[alt] = mid
-
+        if args.ngram:
+            self.ngram = ngram.NGram(self.mids.keys(), threshold=0.5)
+        else:
+            self.ngram = None
 
     def match_read(self, read_mid):
-        return self.mids[read_mid]
+        try:
+            return self.mids[read_mid]
+        except KeyError:
+            if self.ngram:
+                matches = self.ngram.search(read_mid)
+                #log.info('match for {0} is {1}'.format(read_mid, matches[:3]))
+                if matches:
+                    match = matches[0][0]
+                    return self.mids[match]
+            raise
 
     def __call__(self, read):
         try:
@@ -282,7 +298,10 @@ def annotate(args):
     oup = pysam.Samfile(args.output, 'wb', header=header)
 
     log.info('begin read annotation')
+    processed = 0
+    included = 0
     for read in inp:
+        processed += 1
         include = True
         for annotator in annotators:
             # Annotators return False to exclude
@@ -290,11 +309,14 @@ def annotate(args):
                 include = False
                 break
         if include:
+            included += 1
             oup.write(read)
 
 
     for a in annotators:
         a.report()
+
+    print 'processed {0} reads, kept {1} ({2} %)'.format(processed, included, 100*float(included)/processed)
 
 
 def duplicates(args):
