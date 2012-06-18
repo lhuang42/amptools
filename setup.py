@@ -10,6 +10,7 @@ setup(
     install_requires=[
         'pysam>=0.6',
         'pyvcf',
+        'fastinterval',
     ],
     scripts=['amptools/amptools'],
     entry_points = {
