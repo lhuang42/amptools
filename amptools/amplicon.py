@@ -4,7 +4,7 @@ import itertools
 import csv
 import cigar
 import json
-from ucsc import Interval
+from fastinterval import Interval
 import logging; log = logging.getLogger(__name__)
 # set the pileup engine to allow 1500 samples at depth of 200
 PILEUP_MAX_DEPTH = 200 * 1500
@@ -18,7 +18,7 @@ def load_amplicons(design, stats, opts):
         trim_loc = Interval.from_string(row[opts.trim_column])
 
 
-        if not amp_loc.contains(trim_loc):
+        if not trim_loc in amp_loc:
             print('trim location not contained in amplicon location, impossible trim', file=sys.stderr)
             sys.exit(1)
 

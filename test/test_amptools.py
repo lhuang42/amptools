@@ -34,6 +34,9 @@ class AnnotateTest(unittest.TestCase):
 
         args.platform = 'LS454'
         args.library = 'L1'
+        args.exclude_rg = None
+        args.offbyone = None
+        args.ngram = None
 
         anno = annotate.MidAnnotator(args, header)
 
@@ -82,6 +85,7 @@ class AnnotateTest(unittest.TestCase):
         args.trim_column = 'trim'
         args.offset_allowed = 10
         args.clip = False
+        args.exclude_offtarget = False
 
         anno = annotate.AmpliconAnnotator(args, header)
 
@@ -115,6 +119,7 @@ class AnnotateTest(unittest.TestCase):
         args.offset_allowed = 10
         args.clip = True
         args.input = sf
+        args.exclude_offtarget = False
 
         anno = annotate.AmpliconAnnotator(args, header)
 
@@ -205,15 +210,15 @@ class ClipTest(unittest.TestCase):
 expected_stats = """total 320 reads, on target 320, uniq 32
 on target 100.00%
 on target reads per counter: 10.00
-rg amp unique reads
-NA1 A 4 40
-NA1 B 4 40
-NA2 A 4 40
-NA2 B 4 40
-NA3 A 4 40
-NA3 B 4 40
-NA4 A 4 40
-NA4 B 4 40"""
+rg,lib,amp,unique,reads
+NA1,None,A,4,40
+NA1,None,B,4,40
+NA2,None,A,4,40
+NA2,None,B,4,40
+NA3,None,A,4,40
+NA3,None,B,4,40
+NA4,None,A,4,40
+NA4,None,B,4,40"""
 
 class StatsTest(unittest.TestCase):
     def test_stats(self):
@@ -227,8 +232,10 @@ class StatsTest(unittest.TestCase):
         os.system('samtools index %s.sort.bam' % (tmp1))
 
         os.system('amptools duplicates --output %s %s.sort.bam' % (tmp2, tmp1))
+        print tmp1, tmp2
 
         statsout = commands.getoutput('amptools coverage %s' % tmp2)
+        statsout = statsout.replace('\r', '')
         assert statsout == expected_stats
 
 

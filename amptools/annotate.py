@@ -77,12 +77,17 @@ class MidAnnotator(object):
             self.read_rgs = _read_trim_file(args.rgs_read)
             self.read_bcs = None
 
-        mids =  itertools.imap(
-            lambda line: line.rstrip().split('\t', 1),
-            file(args.rgs)
-        )
 
-        self.mids = dict(mids)
+        try:
+            mids =  itertools.imap(
+                lambda line: line.rstrip().split('\t', 1),
+                file(args.rgs)
+            )
+
+            self.mids = dict(mids)
+        except Exception, e:
+            raise Exception('Error loading RGS: ' + str(e))
+
         log.info('read {0} mids'.format(len(self.mids)))
         for x in self.mids.values():
             self.counts[x] = 0
