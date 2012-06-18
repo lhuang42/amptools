@@ -9,6 +9,7 @@ setup(
     packages=['amptools'],
     install_requires=[
         'pysam>=0.6',
+        'pyvcf',
     ],
     scripts=['amptools/amptools'],
     entry_points = {
