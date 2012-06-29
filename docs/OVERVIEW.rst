@@ -162,8 +162,32 @@ from the output.
 Molecular Counters 
 ..................
 
-Molecular counters can be added with the `--
+Molecular counters can be added with the `--counters` flag.  These are expected 
+to be in the same format as the `--rgs-read`.  
 
 
+Output from annotation
+----------------------
 
+The annotation will report the numbers of matching read groups and amplicons::
 
+    amplicon        matches start_trims     end_trims
+    X     84636   42209   42427
+    Y     90956   45762   45191
+    sample reads
+    A1 920127
+    B1 1147972
+
+You can use the `amptools coverage` command to generate the joint distribution 
+of amplicons and samples, as well as some other metadata (written to stderr) 
+about on target reads and proportions of duplicates:: 
+
+    $amptools coverage example.bam
+    total 10745 reads, on target 10745, uniq 10745
+    on target 100.00%
+    on target reads per counter: 1.00
+    rg,lib,amp,unique,reads
+    A1,None,X,20,20
+    A1,None,Y,25,25
+    B1,None,X,15,15
+    B1,None,Y,15,15

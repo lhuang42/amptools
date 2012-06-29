@@ -11,6 +11,7 @@ setup(
         'pysam>=0.6',
         'pyvcf',
         'fastinterval',
+        'ngram'
     ],
     scripts=['amptools/amptools'],
     entry_points = {
