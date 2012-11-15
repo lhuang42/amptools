@@ -61,7 +61,6 @@ class MidAnnotator(object):
 
 
     def __init__(self, args, header):
-
         self.counts = Counter()
 
         assert args.rgs, 'Need --rgs'
@@ -80,7 +79,7 @@ class MidAnnotator(object):
 
         try:
             mids =  itertools.imap(
-                lambda line: line.rstrip().split('\t', 1),
+                lambda line: line.rstrip().split(' ', 1),
                 file(args.rgs)
             )
 
@@ -226,9 +225,11 @@ class AmpliconAnnotator(object):
                 help='Exclude reads not matching target amplicons')
         # FIXME: remove argument?
         group.add_argument('--clip', action='store_true')
+        group.add_argument('--pe', action='store_true')
 
 
     def __init__(self, args, header):
+        self.args = args
         self.stats = stats.Stats('')
         self.amplicons = amplicon.load_amplicons(args.amps, self.stats, args)
         self.clip = args.clip
@@ -263,6 +264,8 @@ class AmpliconAnnotator(object):
                     clipped = amp.clip(read)
                     if clipped:
                         return clipped
+                    elif self.args.pe:
+                        return read
                     else:
                         return False
                 else:

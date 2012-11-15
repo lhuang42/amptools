@@ -14,11 +14,13 @@ class AmpliconClipper(object):
         parser.add_argument('--amplicon-column', type=str, help='amps file', default='amplicon')
         parser.add_argument('--trim-column', type=str, help='amps file', default='trim')
         parser.add_argument('--delimiter', type=str, help='file', default='\t')
-        parser.add_argument('--offset-allowed', type=int, help='file', default=10)
+        parser.add_argument('--offset-allowed', type=int, help='offset to start', default=10)
         parser.add_argument('--clip', action='store_true')
+        parser.add_argument('--pe', action='store_true', help='fix for pe single primer')
 
 
     def __init__(self, args):
+        self.args = args
         self.stats = stats.Stats('')
         self.samfile = pysam.Samfile(args.input)
         self.amplicons = amplicon.load_amplicons_from_header(self.samfile.header, self.stats, self.samfile)
@@ -30,7 +32,7 @@ class AmpliconClipper(object):
             EA = dict(r.tags).get('ea', None)
             if EA is not None:
                 clipped = self.amplicons[EA].clip(r)
-                if clipped:
+                if clipped or self.args.pe:
                     outfile.write(r)
             else:
                 outfile.write(r)

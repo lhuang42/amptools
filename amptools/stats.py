@@ -230,7 +230,10 @@ def coverage(args):
 
     total_ot_p = (100.0 * total_ot) / total
 
-    reads_per_counter = float(total_ot) / total_uniq
+    try:
+        reads_per_counter = float(total_ot) / total_uniq
+    except ZeroDivisionError:
+        reads_per_counter = 0
 
     print('total %(total)s reads, on target %(total_ot)s, uniq %(total_uniq)s' % locals(), file=sys.stderr)
     print('on target %3.2f%%' % total_ot_p, file=sys.stderr)
