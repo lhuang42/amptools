@@ -244,7 +244,10 @@ def coverage(args):
         control_p = (100*total_control)/total
         print('control reads %(total_control)s, %(control_p)f%%' % locals(), file=sys.stderr)
 
-    out = csv.writer(sys.stdout)
+    if not args.output:
+        out = csv.writer(sys.stdout)
+    else:
+        out = csv.writer(open(args.output, 'w'))
     out.writerow(['rg', 'lib', 'amp', 'unique', 'reads'])
     for (rg, amp) in sorted(reads):
         if rg != args.control:

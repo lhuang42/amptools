@@ -372,7 +372,7 @@ def duplicates(args):
         for dups in groups.values():
 
             # FIXME: option to choose best read stratedy
-            keyfunc = lambda x: x.mapq
+            keyfunc = lambda x: (x.mapq, x.qlen)
             #if opts.length:
             #    keyfunc = lambda x: x.qlen
 

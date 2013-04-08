@@ -8,6 +8,7 @@ import sys
 import annotate
 import clip
 import stats
+import consensusdedup
 
 
 parser = argparse.ArgumentParser(prog='amptools', description=sys.modules[__name__].__doc__)
@@ -46,4 +47,11 @@ parser_cov = subparsers.add_parser('coverage', help='coverage')
 parser_cov.set_defaults(func=stats.coverage)
 parser_cov.add_argument('input', type=str, help='input file')
 parser_cov.add_argument('--control', type=str, help='control RG')
+parser_cov.add_argument('--output', type=str, help='output file or stdout')
 
+# consensus read deduplication
+parser_d = subparsers.add_parser('consensus-deduplicate', description=consensusdedup.duplicates.__doc__,
+        help='mark duplicates based on molecular counter, export consensus alignment')
+parser_d.set_defaults(func=consensusdedup.duplicates)
+parser_d.add_argument('input', type=str, help='input BAM file')
+parser_d.add_argument('--output', type=str, help='output BAM file (default stdout)', default='-')
