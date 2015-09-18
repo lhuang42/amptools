@@ -115,7 +115,7 @@ class Amplicon(object):
     def _find_position(self, pos, posns, lower=True):
 
         # find the pairing to a given position in the reference
-        for x in posns:
+        for x in enumerate(posns):
             if x[1] == pos:
                 match = x
                 break
