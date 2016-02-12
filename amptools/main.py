@@ -11,6 +11,8 @@ import stats
 
 
 parser = argparse.ArgumentParser(prog='amptools', description=sys.modules[__name__].__doc__)
+parser.add_argument('--version', action='version', version='%(prog)s 0.1.1')
+
 parser.add_argument('--profile', action='store_true', help='run with profiling')
 parser.add_argument('--verbose', '-v', action='count', help='verbosity (use -vv for debug)')
 subparsers = parser.add_subparsers(help='sub-command help')
